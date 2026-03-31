@@ -1,4 +1,7 @@
 ﻿<#
+Copyright (c) 2026 Alex Bird
+Use of this source code is governed by an MIT-style
+license that can be found in the LICENSE file.
 .SYNOPSIS
     Графический интерфейс управления сертификатами и компонентами Авест
 .DESCRIPTION
