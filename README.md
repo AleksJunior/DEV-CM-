@@ -16,7 +16,6 @@
 - **Разработчики** — для понимания архитектуры и возможности расширения
 - **Техническая поддержка** — для диагностики проблем
 
-Purpose
 Certificate Manager V2.0 is a suite of PowerShell scripts designed to automate certificate and cryptographic component management within the infrastructure of the Republic of Belarus.
 
 Core Features
