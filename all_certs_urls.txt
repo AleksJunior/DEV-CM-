@@ -1,0 +1,70 @@
+#Добавьте новую ссылку в конец файла (каждая ссылка с новой строки)
+#Пример:
+#https://example.com/certificates/new-cert.cer
+#https://example.com/crls/new-crl.crl
+#если добавить знак "#" (решётка, хеш) перед ссылкой, то она(ссылка) не будет учитываться программой
+#Пример:
+# #https://example.com/crls/new-crl.crl
+#Сохраните файл (Ctrl + S) или сохраните при закрытии документа нажав на соответствующую кнопку всплывшего окна
+#Запустите обновление — нажмите кнопку "Обновить сертификаты" в программе
+
+
+# ======================================================
+# НЦЭУ / ГосСУОК - СЕРТИФИКАТЫ (.cer)
+# ======================================================
+https://nces.by/wp-content/uploads/certificates/pki/kuc2.cer
+https://nces.by/wp-content/uploads/certificates/pki/kuc.cer
+https://nces.by/wp-content/uploads/certificates/pki/kuc1.cer
+https://nces.by/wp-content/uploads/certificates/pki/ruc3.cer
+https://nces.by/wp-content/uploads/certificates/pki/ruc2.cer
+https://nces.by/wp-content/uploads/certificates/pki/ruc1.cer
+https://nces.by/wp-content/uploads/certificates/pki/ruc.cer
+https://nces.by/wp-content/uploads/certificates/pki/ruc_old.cer
+https://nces.by/wp-content/uploads/certificates/pki/cas_ruc3.cer
+https://nces.by/wp-content/uploads/certificates/pki/cas_ruc2.cer
+https://nces.by/wp-content/uploads/certificates/atrib-cert-ul.cer
+
+# ======================================================
+# НЦЭУ / ГосСУОК - СОС (.crl)
+# ======================================================
+https://nces.by/wp-content/uploads/certificates/pki/kuc2.crl
+https://nces.by/wp-content/uploads/certificates/pki/kuc1.crl
+https://nces.by/wp-content/uploads/certificates/pki/kuc.crl
+https://nces.by/wp-content/uploads/certificates/pki/ruc3.crl
+https://nces.by/wp-content/uploads/certificates/pki/ruc2.crl
+https://nces.by/wp-content/uploads/certificates/pki/ruc.crl
+https://nces.by/wp-content/uploads/certificates/pki/cas_ruc3.crl
+https://nces.by/wp-content/uploads/certificates/pki/cas_ruc2.crl
+https://nces.by/wp-content/uploads/certificates/pki/cas_ruc.crl
+
+# ======================================================
+# НЦЭП - СЕРТИФИКАТЫ, СОС  (.cer, .crl)
+# ======================================================
+https://ca.nepc.by/certificates/nepc.cer
+https://ca.nepc.by/certificates/nepc.crl
+https://ca.nepc.by/certificates/acs_nepc.cer
+https://ca.nepc.by/certificates/acs_nepc.crl
+https://ca.nepc.by/certificates/ncmps2024.cer
+https://ca.nepc.by/certificates/ncmps2024.crl
+https://ca.nepc.by/certificates/acs_ncmps2024.cer
+https://ca.nepc.by/certificates/acs_ncmps2024.crl
+
+# ======================================================
+# МНС - СЕРТИФИКАТЫ (.cer)
+# ======================================================
+http://www.portal.nalog.gov.by/ca/mns_root.cer
+http://www.portal.nalog.gov.by/ca/mns_work.cer
+
+# ======================================================
+# МНС - СОС (.crl)
+# ======================================================
+http://www.portal.nalog.gov.by/ca/mns-ra.crl
+http://www.portal.nalog.gov.by/ca/mns-ca.crl
+
+# ======================================================
+# ДОПОЛНИТЕЛЬНЫЕ СЕРТИФИКАТЫ 
+# ======================================================
+http://nces.by/wp-content/uploads/certificates/rootc.cer
+http://nces.by/wp-content/uploads/certificates/verifyingc.cer
+http://e-respondent.belstat.gov.by/belstat/resources/files/pem.belstat.cer
+https://www.belstat.gov.by/upload-belstat/upload-belstat-respondent/belstat.p7b
