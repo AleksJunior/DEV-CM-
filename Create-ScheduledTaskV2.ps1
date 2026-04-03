@@ -8,7 +8,7 @@ license that can be found in the LICENSE file.
     Автоматическая настройка планировщика заданий для регулярного обновления сертификатов.
     
     Создаваемая задача:
-        Имя: UpdateCertificatesV2
+        Имя: Update-OnlyCertificates
         Триггер: При старте системы (At system startup)
         Задержка: 2 минуты
         Пользователь: SYSTEM (выполняется от имени системы)
@@ -49,10 +49,10 @@ license that can be found in the LICENSE file.
         - Файл Update-OnlyCertificates.ps1 в папке со скриптом
     
     Просмотр созданной задачи:
-        taskschd.msc → Библиотека планировщика → UpdateCertificatesV2
+        taskschd.msc → Библиотека планировщика → Update-OnlyCertificates
     
     Удаление задачи:
-        schtasks /delete /tn UpdateCertificatesV2 /f
+        schtasks /delete /tn Update-OnlyCertificates /f
     
     Важно:
         - Задача создаётся от имени SYSTEM, не требует входа пользователя
@@ -60,9 +60,9 @@ license that can be found in the LICENSE file.
         - Логи накапливаются в папке logs, рекомендуется периодическая очистка
     
     Пример вывода:
-        Задача 'UpdateCertificatesV2' создана успешно!
+        Задача 'Update-OnlyCertificates' создана успешно!
         Параметры задачи:
-          - Имя: UpdateCertificatesV2
+          - Имя: Update-OnlyCertificates
           - Запуск: при старте системы
           - Задержка: 2 минуты
           - Пользователь: SYSTEM
@@ -94,7 +94,7 @@ if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
 # ======================================================
 # Путь к скрипту обновления и имя задачи в планировщике
 $updateScript = Join-Path $scriptPath "Update-OnlyCertificates.ps1"
-$taskName = "UpdateCertificatesV2"
+$taskName = "Update-OnlyCertificates"
 
 # ======================================================
 # 3. ПРОВЕРКА СУЩЕСТВОВАНИЯ СКРИПТА
@@ -119,6 +119,7 @@ Write-Host "Будет создана задача '$taskName' со следую
 Write-Host "  - Запуск: при старте системы" -ForegroundColor Gray
 Write-Host "  - Задержка: 2 минуты" -ForegroundColor Gray
 Write-Host "  - Пользователь: SYSTEM" -ForegroundColor Gray
+Write-Host "  - Действие: только обновление сертификатов" -ForegroundColor Gray
 Write-Host "  - Проверка интернета: ДА (ожидание до 5 минут)" -ForegroundColor Gray
 Write-Host ""
 Write-Host "Продолжить? (д/н)" -ForegroundColor Yellow
