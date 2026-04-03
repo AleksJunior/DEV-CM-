@@ -12,7 +12,7 @@ license that can be found in the LICENSE file.
     Алгоритм поиска установщика:
         1. Поиск в распакованных компонентах (.\.avest\unpacked\)
            - По шаблонам: AvPKISetup(*)\data\AvCMXWebP-*.exe
-           - Рекурсивный поиск по всей папке
+           - Рекурсивный поиск по всей папке (возвращается самый новый файл)
         
         2. Если не найден - поиск в сетевой папке (для корпоративных развертываний)
            Путь: \\asup-7\BackBox\DEV\CertificateManager V2.0\avest\unpacked
@@ -202,7 +202,7 @@ function Test-InternetConnection {
 }
 
 # Функция скачивания файла с резервными ссылками
-function Download-FileWithFallback {
+function Save-FileWithFallback {
     param(
         [string[]]$Urls,
         [string]$DestinationPath,
@@ -243,12 +243,13 @@ function Download-FileWithFallback {
 }
 
 # Функция скачивания AvPass (с резервными ссылками)
-function Download-AvPass {
+function Save-AvPass {
     Write-Log "Загрузка AvPass из интернета..."
     Write-Host "`n[1/3] Загрузка AvPass..." -ForegroundColor Yellow
     
     $archivePath = Join-Path $ArchivesFolder "AvPKISetup(bel).zip"
     
+    # ИСПРАВЛЕНО: прямой вызов функции вместо Invoke-Expression
     $result = Download-FileWithFallback -Urls $avPassUrls -DestinationPath $archivePath -ComponentName "AvPass"
     
     if ($result) {
@@ -261,12 +262,13 @@ function Download-AvPass {
 }
 
 # Функция скачивания AvBign (резервный вариант)
-function Download-AvBign {
+function Save-AvBign {
     Write-Log "Загрузка AvBign из интернета..."
     Write-Host "`n[2/3] Загрузка AvBign (резервный вариант)..." -ForegroundColor Yellow
     
     $archivePath = Join-Path $ArchivesFolder "AvPKISetup(bign).zip"
     
+    # ИСПРАВЛЕНО: прямой вызов функции вместо Invoke-Expression
     $result = Download-FileWithFallback -Urls $avBignUrls -DestinationPath $archivePath -ComponentName "AvBign"
     
     if ($result) {
@@ -279,7 +281,7 @@ function Download-AvBign {
 }
 
 # Функция распаковки архива (ZIP)
-function Extract-Archive {
+function Expand-Archive {
     param(
         [string]$ArchivePath,
         [string]$DestinationPath,
@@ -318,7 +320,16 @@ function Find-InUnpacked {
     
     Write-Log "Поиск установщика AvCMXWebP в папке: $UnpackedFolder"
     
-    # Поиск по шаблонам (приоритетные пути)
+    # ИСПРАВЛЕНО: сначала выполняем рекурсивный поиск всех установщиков
+    $allInstallers = Get-ChildItem -Path $UnpackedFolder -Recurse -Filter "AvCMXWebP-*.exe" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
+    
+    if ($allInstallers.Count -gt 0) {
+        Write-Log "Найден установщик при рекурсивном поиске: $($allInstallers[0].Name)"
+        Write-Host "  Найден: $($allInstallers[0].Name)" -ForegroundColor Green
+        return $allInstallers[0]
+    }
+    
+    # Если не нашли, пробуем поиск по шаблонам (на случай, если рекурсивный поиск почему-то не сработал)
     $searchPatterns = @(
         "AvPKISetup(bign)\data\AvCMXWebP-*.exe",
         "AvPKISetup(bel)\data\AvCMXWebP-*.exe"
@@ -332,16 +343,6 @@ function Find-InUnpacked {
             Write-Host "  Найден: $($files[0].Name)" -ForegroundColor Green
             return $files[0]
         }
-    }
-    
-    # Рекурсивный поиск, если по шаблонам не нашли
-    Write-Log "Поиск по шаблонам не дал результата, выполняю рекурсивный поиск..."
-    $allInstallers = Get-ChildItem -Path $UnpackedFolder -Recurse -Filter "AvCMXWebP-*.exe" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
-    
-    if ($allInstallers.Count -gt 0) {
-        Write-Log "Найден установщик при рекурсивном поиске: $($allInstallers[0].Name)"
-        Write-Host "  Найден: $($allInstallers[0].Name)" -ForegroundColor Green
-        return $allInstallers[0]
     }
     
     Write-Log "Установщик плагина не найден"
@@ -397,7 +398,7 @@ function Copy-FromNetwork {
 }
 
 # Функция проверки установленного плагина
-function Check-PluginInstalled {
+function Test-PluginInstalled {
     Write-Log "Проверка наличия установленного AvCMXWebP..."
     
     # Проверка в реестре
@@ -497,6 +498,7 @@ function DownloadAndExtract {
     
     # Распаковываем компонент (без установки!)
     $archivePath = Join-Path $ArchivesFolder $ArchiveName
+    # ИСПРАВЛЕНО: вызов функции с правильными параметрами
     $extractSuccess = Extract-Archive -ArchivePath $archivePath -DestinationPath $UnpackedFolder -ComponentName $DisplayName
     
     if (-not $extractSuccess) {
