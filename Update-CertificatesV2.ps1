@@ -23,7 +23,7 @@ license that can be found in the LICENSE file.
         - Совместимость со старыми версиями (поиск Update-Certificates.ps1)
     
     Параметры:
-        -ФайлРезультата : путь к файлу для сохранения результата в формате JSON
+        -ResultFile : путь к файлу для сохранения результата в формате JSON
                           (передаётся в Update-CertificatesV2_Core.ps1)
     
     Коды возврата:
@@ -57,21 +57,21 @@ license that can be found in the LICENSE file.
 #>
 
 param(
-    [string]$ФайлРезультата
+    [string]$ResultFile
 )
 
 # ======================================================
 # 1. НАСТРОЙКА ПУТЕЙ
 # ======================================================
 if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
-    $путьСкрипта = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 } else {
-    $путьСкрипта = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
-    if (!$путьСкрипта) { $путьСкрипта = "." }
+    $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    if (!$scriptPath) { $scriptPath = "." }
 }
 
-$скриптУстановки = Join-Path $путьСкрипта "Install-AvestComponents.ps1"
-$скриптСертификатов = Join-Path $путьСкрипта "Update-CertificatesV2_Core.ps1"
+$installScript = Join-Path $scriptPath "Install-AvestComponents.ps1"
+$certScript = Join-Path $scriptPath "Update-CertificatesV2_Core.ps1"
 
 # ======================================================
 # 2. ПРОВЕРКА ПРАВ АДМИНИСТРАТОРА
@@ -91,15 +91,15 @@ Write-Host ""
 # ======================================================
 # 3. УСТАНОВКА КОМПОНЕНТОВ АВЕСТ
 # ======================================================
-if (Test-Path $скриптУстановки) {
+if (Test-Path $installScript) {
     Write-Host "[1/2] Проверка и установка компонентов Авест..." -ForegroundColor Yellow
-    & $скриптУстановки -ПутьСкрипта $путьСкрипта
+    & $installScript -ScriptPath $scriptPath
     
     if ($LASTEXITCODE -ne 0) {
         Write-Host "  Предупреждение: установка компонентов завершилась с ошибкой" -ForegroundColor Yellow
     }
 } else {
-    Write-Host "[1/2] Скрипт установки не найден: $скриптУстановки" -ForegroundColor Red
+    Write-Host "[1/2] Скрипт установки не найден: $installScript" -ForegroundColor Red
     Write-Host "  Установка компонентов пропущена" -ForegroundColor Yellow
 }
 
@@ -109,16 +109,16 @@ if (Test-Path $скриптУстановки) {
 Write-Host ""
 Write-Host "[2/2] Обновление сертификатов..." -ForegroundColor Yellow
 
-if (Test-Path $скриптСертификатов) {
-    & $скриптСертификатов -ФайлРезультата $ФайлРезультата
+if (Test-Path $certScript) {
+    & $certScript -ResultFile $ResultFile
     exit $LASTEXITCODE
 } else {
-    Write-Host "  Скрипт обновления сертификатов не найден: $скриптСертификатов" -ForegroundColor Red
+    Write-Host "  Скрипт обновления сертификатов не найден: $certScript" -ForegroundColor Red
     Write-Host "  Попытка использовать старую версию..." -ForegroundColor Yellow
     
-    $старыйСкрипт = Join-Path $путьСкрипта "Update-Certificates.ps1"
-    if (Test-Path $старыйСкрипт) {
-        & $старыйСкрипт -ФайлРезультата $ФайлРезультата
+    $oldScript = Join-Path $scriptPath "Update-Certificates.ps1"
+    if (Test-Path $oldScript) {
+        & $oldScript -ResultFile $ResultFile
         exit $LASTEXITCODE
     } else {
         Write-Host "  ОШИБКА: Не найден скрипт обновления сертификатов" -ForegroundColor Red
