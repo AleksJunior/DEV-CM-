@@ -1,5 +1,7 @@
 # DEV-CM-
-"Менеджер сертификатов" V2.0 — это комплекс PowerShell-скриптов для автоматизации управления сертификатами и 
+# "Менеджер сертификатов" V2.0 
+
+Это комплекс PowerShell-скриптов для автоматизации управления сертификатами и 
 криптографическими компонентами в инфраструктуре Республики Беларусь.
 
 # Основные задачи
@@ -12,7 +14,9 @@
 | Мониторинг                  | Проверка статуса установленных компонентов и логирование всех операций                     |
 
 
-Certificate Manager V2.0 is a suite of PowerShell scripts designed to automate certificate and cryptographic component management within the infrastructure of the Republic of Belarus.
+# Certificate Manager V2.0
+
+Is a suite of PowerShell scripts designed to automate certificate and cryptographic component management within the infrastructure of the Republic of Belarus.
 
 # Core Features
 |Feature	                     |Description                                                                                                      |
