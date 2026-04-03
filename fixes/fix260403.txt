@@ -1,0 +1,36 @@
+2026.04.03
+fix: переименование функций для соответствия утверждённым глаголам PSScriptAnalyzer
+
+ИЗМЕНЕНИЯ В Common-Functions.ps1:
+- Download-FileWithFallback → Save-FileWithFallback
+- Extract-Archive → Expand-Archive
+- Load-Config → Import-Config
+- Check-AvPass → Test-AvPass
+- Check-AvBign → Test-AvBign
+- Check-AvCSPBel → Test-AvCSPBel
+- Check-AvCSPBign → Test-AvCSPBign
+- Check-AvReg → Test-AvReg
+
+ИЗМЕНЕНИЯ В Install-AvCMXWebP.ps1:
+- Убраны вызовы Invoke-Expression
+- Исправлен вызов распаковки архива
+- Исправлен поиск установщика (рекурсивный поиск)
+- Переименованы функции согласно утверждённым глаголам
+
+ИЗМЕНЕНИЯ В Create-ScheduledTaskV2.ps1:
+- Исправлено сообщение об ошибке (Update-OnlyCertificates.ps1)
+
+ИЗМЕНЕНИЯ В Update-CertificatesV2_Core.ps1:
+- Перемещена проверка $целостностьОК после поиска утилит
+- Добавлена функция Close-BlockingPrograms (проверка AvPCM, certmgr, mmc)
+
+ИЗМЕНЕНИЯ В Deploy-CertificateManagerV2.ps1:
+- Исправлен синтаксис объявления массива $foldersToCreate
+
+ДОБАВЛЕНА ПРОВЕРКА ПРАВ АДМИНИСТРАТОРА:
+- Install-AvestComponents.ps1
+- Install-AvCMXWebP.ps1
+- Create-ScheduledTaskV2.ps1
+
+Теперь все скрипты соответствуют правилам PSScriptAnalyzer для утверждённых глаголов
+и имеют правильную обработку блокировки хранилища сертификатов.
