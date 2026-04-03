@@ -11,24 +11,15 @@
 | Автоматизация               | Настройка автозапуска обновления через планировщик заданий Windows                         |
 | Мониторинг                  | Проверка статуса установленных компонентов и логирование всех операций                     |
 
-# Целевая аудитория
-- **Системные администраторы** — для массового развертывания и поддержки
-- **Разработчики** — для понимания архитектуры и возможности расширения
-- **Техническая поддержка** — для диагностики проблем
 
 Certificate Manager V2.0 is a suite of PowerShell scripts designed to automate certificate and cryptographic component management within the infrastructure of the Republic of Belarus.
 
-Core Features
-Feature	Description
-Certificate Update	Download and install root/intermediate certificates and Certificate Revocation Lists (CRLs) from trusted sources
-Avest Component Setup	Automated installation of crypto providers and client software packages
-AvCMXWebP Plugin Installation	Install plugin for portal access using IE Mode in Microsoft Edge
-Automation	Configure automatic update triggers via Windows Task Scheduler
-Monitoring	Verify component installation status and log all operations
+#Core Features
+Feature	                       Description
 
-Target Audience
-System Administrators — for mass deployment and maintenance
+Certificate Update	           Download and install root/intermediate certificates and Certificate Revocation Lists (CRLs) from trusted sources
+Avest Component Setup	         Automated installation of crypto providers and client software packages
+AvCMXWebP Plugin Installation	 Install plugin for portal access using IE Mode in Microsoft Edge
+Automation	                   Configure automatic update triggers via Windows Task Scheduler
+Monitoring	                   Verify component installation status and log all operations
 
-Developers — to understand architecture and extend functionality
-
-Technical Support — for issue diagnostics and troubleshooting
