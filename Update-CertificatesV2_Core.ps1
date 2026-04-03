@@ -389,6 +389,54 @@ Write-Host ("`n" + ("="*70))
 Write-Host "ИМПОРТ ФАЙЛОВ"
 Write-Host ("="*70)
 
+function Close-CertificateManager {
+    $processes = @("certmgr", "mmc")
+    $found = $false
+    
+    foreach ($procName in $processes) {
+        $proc = Get-Process -Name $procName -ErrorAction SilentlyContinue
+        if ($proc) {
+            $found = $true
+            break
+        }
+    }
+    
+    if ($found) {
+        Write-Host "`n" + ("="*70) -ForegroundColor Yellow
+        Write-Host "  ВНИМАНИЕ: Обнаружен открытый менеджер сертификатов!" -ForegroundColor Yellow
+        Write-Host ("="*70) -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "Открытый certmgr.msc или MMC блокирует импорт сертификатов." -ForegroundColor Cyan
+        Write-Host "Скрипт будет ждать, пока вы закроете менеджер сертификатов." -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "Пожалуйста, закройте все окна:" -ForegroundColor Yellow
+        Write-Host "  • certmgr.msc (Управление сертификатами)" -ForegroundColor Gray
+        Write-Host "  • mmc с оснасткой 'Сертификаты'" -ForegroundColor Gray
+        Write-Host "  • Любые другие программы, работающие с сертификатами" -ForegroundColor Gray
+        Write-Host ""
+        
+        do {
+            Write-Host "  Ожидание закрытия менеджера сертификатов... (Ctrl+C для отмены)" -ForegroundColor Gray
+            Start-Sleep -Seconds 5
+            
+            $stillOpen = $false
+            foreach ($procName in $processes) {
+                $proc = Get-Process -Name $procName -ErrorAction SilentlyContinue
+                if ($proc) {
+                    $stillOpen = $true
+                    break
+                }
+            }
+        } while ($stillOpen)
+        
+        Write-Host "  Менеджер сертификатов закрыт. Продолжение..." -ForegroundColor Green
+        Start-Sleep -Seconds 2
+    }
+}
+
+# Вызов проверки
+Close-CertificateManager
+
 foreach ($ключ in $скачанныеФайлы.Keys) {
     $инфо = $скачанныеФайлы[$ключ]
     Write-Host "`n$ключ"
