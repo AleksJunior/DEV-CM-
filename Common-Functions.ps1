@@ -145,14 +145,14 @@ function Test-InternetConnection {
 }
 
 # Скачивание файла с поддержкой резервных URL
-function Download-FileWithFallback {
+function Save-FileWithFallback {
     param(
         [hashtable]$Config,
         [string]$DestinationFolder
     )
     
-    $destinationPath = Join-Path $DestinationFolder $Config.FileName
-    $destinationDir = Split-Path $destinationPath -Parent
+    # Создаём папку назначения, если её нет
+    $destinationDir = Join-Path $DestinationFolder $Config.FileName | Split-Path -Parent
     if (!(Test-Path $destinationDir)) {
         New-Item -ItemType Directory -Path $destinationDir -Force | Out-Null
     }
@@ -215,7 +215,7 @@ function Get-WinRARPath {
 }
 
 # Распаковка ZIP и RAR архивов (RAR требует WinRAR)
-function Extract-Archive {
+function Expand-Archive {
     param(
         [string]$ArchivePath,
         [string]$DestinationPath
@@ -277,7 +277,7 @@ function Extract-Archive {
 # 5. КОНФИГУРАЦИЯ
 # ======================================================
 # Загрузка INI-файлов конфигурации в хеш-таблицу
-function Load-Config {
+function Import-Config {
     param([string]$ConfigFile)
     
     $config = @{}
@@ -341,7 +341,7 @@ function Confirm-Action {
 # 7. ПРОВЕРКА КОМПОНЕНТОВ АВЕСТ
 # ======================================================
 # Проверка установки AvPass
-function Check-AvPass {
+function Test-AvPass {
     Write-Log -Message "Проверка AvPass..." -LogFile $script:LogPath
     
     # 1. Проверка файловой системы
@@ -350,10 +350,16 @@ function Check-AvPass {
         "C:\Program Files (x86)\Avest\AvPCM\AvPCM.exe",
         "C:\Program Files\Avest\AvPCM_nces\AvPCM.exe",
         "C:\Program Files (x86)\Avest\AvPCM_nces\AvPCM.exe",
+        "C:\Program Files\Avest\AvPCM_ncesBign\AvPCM.exe",
+        "C:\Program Files (x86)\Avest\AvPCM_ncesBign\AvPCM.exe",
         "C:\Program Files\Avest\AvPCM_nces\MngCert.exe",
         "C:\Program Files (x86)\Avest\AvPCM_nces\MngCert.exe",
+        "C:\Program Files\Avest\AvPCM_ncesBign\MngCert.exe",
+        "C:\Program Files (x86)\Avest\AvPCM_ncesBign\MngCert.exe",
         "C:\Program Files\Avest\AvPCM_nces\AvCmUt4.exe",
-        "C:\Program Files (x86)\Avest\AvPCM_nces\AvCmUt4.exe"
+        "C:\Program Files (x86)\Avest\AvPCM_nces\AvCmUt4.exe",
+        "C:\Program Files\Avest\AvPCM_ncesBign\AvCmUt4.exe",
+        "C:\Program Files (x86)\Avest\AvPCM_ncesBign\AvCmUt4.exe"
     )
     foreach ($path in $paths) {
         if (Test-Path $path) { 
@@ -390,7 +396,7 @@ function Check-AvPass {
 }
 
 # Проверка установки AvBign
-function Check-AvBign {
+function Save-AvBign {
     Write-Log -Message "Проверка AvBign..." -LogFile $script:LogPath
     
     # 1. Проверка файловой системы
@@ -441,7 +447,7 @@ function Check-AvBign {
 }
 
 # Проверка установки AvCSPBel
-function Check-AvCSPBel {
+function Test-AvCSPBel {
     Write-Log -Message "Проверка AvCSPBel..." -LogFile $script:LogPath
     
     # 1. Проверка файловой системы
@@ -486,7 +492,7 @@ function Check-AvCSPBel {
 }
 
 # Проверка установки AvCSPBign
-function Check-AvCSPBign {
+function Test-AvCSPBign {
     Write-Log -Message "Проверка AvCSPBign..." -LogFile $script:LogPath
     
     # 1. Проверка файловой системы
@@ -531,7 +537,7 @@ function Check-AvCSPBign {
 }
 
 # Проверка реестровых настроек SAI DLL
-function Check-AvReg {
+function Test-AvReg {
     Write-Log -Message "Проверка AvReg..." -LogFile $script:LogPath
     
     $path1 = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows"
@@ -552,5 +558,5 @@ function Check-AvReg {
     }
     
     Write-Log -Message "  AvReg не найден" -LogFile $script:LogPath
-    return $false
+    return $false 
 }
