@@ -1,1904 +1,258 @@
-# 📘 Менеджер сертификатов V2.0 — Полная техническая документация
+# 📘 Менеджер сертификатов V2.0 — Техническая документация
 
-## Оглавление
-1. [Общее описание проекта](#1-общее-описание-проекта)
-2. [Архитектура и структура проекта](#2-архитектура-и-структура-проекта)
-3. [Подробное описание каждого скрипта](#3-подробное-описание-каждого-скрипта)
-4. [Структура папок и назначение](#4-структура-папок-и-назначение)
-5. [Конфигурационные файлы](#5-конфигурационные-файлы)
-6. [Алгоритмы работы](#6-алгоритмы-работы)
-7. [API и функции](#7-api-и-функции)
-8. [Обработка ошибок и логирование](#8-обработка-ошибок-и-логирование)
-9. [Требования к системе](#9-требования-к-системе)
-10. [Процесс развертывания](#10-процесс-развертывания)
-11. [Руководство по эксплуатации](#11-руководство-по-эксплуатации)
-12. [Устранение неполадок](#12-устранение-неполадок)
-13. [Расширение и модификация](#13-расширение-и-модификация)
+## 1. Общее описание
+
+Менеджер сертификатов V2.0 — комплекс PowerShell-скриптов для автоматизации управления сертификатами и криптографическими компонентами.
+
+**Основные задачи:**
+- Обновление сертификатов и списков отзыва (CRL)
+- Установка компонентов Авест (криптопровайдеры, комплекты абонента)
+- Установка плагина AvCMXWebP для работы порталов в IE Mode
+- Настройка автозапуска через планировщик Windows
+- Мониторинг и логирование всех операций
 
 ---
 
-## 1. Общее описание проекта
+## 2. Архитектура проекта
 
-### 1.1. Назначение
-Менеджер сертификатов V2.0 — это комплекс PowerShell-скриптов для автоматизации управления сертификатами и 
-криптографическими компонентами в инфраструктуре Республики Беларусь.
+CertificateManagerV2.ps1 (GUI)
+         │
+    ┌────┼────┬──────────────┐
+    ▼    ▼    ▼              ▼
+Update-  Install-  Install-   Create-
+Only     Avest    AvCMXWebP  Scheduled
+Certif.  Compon.             TaskV2
+    │    │         │              │
+    └────┴────┬────┘              │
+             ▼                    │
+      Update-CertificatesV2_Core  │
+             │                    │
+             └──────────┬─────────┘
+                        ▼
+                Common-Functions.ps1
 
-### 1.2. Основные задачи
-| Задача                      | Описание                                                                                   |
-|-----------------------------|--------------------------------------------------------------------------------------------|
-| Обновление сертификатов     | Скачивание и установка корневых и промежуточных сертификатов, СОС из доверенных источников |
-| Установка компонентов Авест | Автоматическая установка криптопровайдеров и комплектов абонента                           |
-| Установка плагина AvCMXWebP | Установка плагина для работы с порталами в режиме IE Mode в Edge                           |
-| Автоматизация               | Настройка автозапуска обновления через планировщик заданий Windows                         |
-| Мониторинг                  | Проверка статуса установленных компонентов и логирование всех операций                     |
-
-### 1.3. Целевая аудитория
-- **Системные администраторы** — для массового развертывания и поддержки
-- **Разработчики** — для понимания архитектуры и возможности расширения
-- **Техническая поддержка** — для диагностики проблем
-
----
-
-## 2. Архитектура и структура проекта
-
-### 2.1. Общая архитектура
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                  CertificateManagerV2.ps1                       │
-│                    (GUI — точка входа)                          │
-└───────────────────────────────┬─────────────────────────────────┘
-                                │
-        ┌───────────────────────┼───────────────────────┐
-        ▼                       ▼                       ▼
-┌───────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│Update-Only    │     │Install-Avest    │     │Create-Scheduled │
-│Certificates   │     │Components       │     │TaskV2           │
-└───────┬───────┘     └────────┬────────┘     └─────────────────┘
-        │                      │
-        ▼                      ▼
-┌───────────────┐     ┌─────────────────┐
-│Update-Certi-  │     │Install-AvCMX    │
-│ficatesV2_Core │     │WebP             │
-└───────────────┘     └─────────────────┘
-        │                      │
-        └──────────┬───────────┘
-                   ▼
-        ┌─────────────────────┐
-        │  Common-Functions   │
-        │     .ps1            │
-        └─────────────────────┘
-```
-
-### 2.2. Взаимосвязи между скриптами
-
-| Скрипт                           | Зависимости                             | Вызывается из                    |
-|----------------------------------|-----------------------------------------|----------------------------------|
-| CertificateManagerV2.ps1         | Common-Functions.ps1 (косвенно)         | Пользователь (GUI)               |
-| Update-OnlyCertificates.ps1      | Update-CertificatesV2_Core.ps1          | GUI, Планировщик                 |
-| Update-CertificatesV2_Core.ps1   | Common-Functions.ps1, all_certs_urls.txt| GUI, Update-OnlyCertificates.ps1 |
-| Install-AvestComponents.ps1      | Common-Functions.ps1, avest_urls.ini    | GUI, Update-CertificatesV2.ps1   |
-| Install-AvCMXWebP.ps1            | Common-Functions.ps1                    | GUI                              |
-| Create-ScheduledTaskV2.ps1       | Update-OnlyCertificates.ps1             | GUI, Deploy                      |
-| Deploy-CertificateManagerV2.ps1  | Все скрипты                             | Администратор                    |
-| Common-Functions.ps1             | Нет                                     | Все остальные                    |
+**Взаимосвязи:**
+- `CertificateManagerV2.ps1` — GUI, точка входа
+- `Update-OnlyCertificates.ps1` — обновление сертификатов (для GUI и планировщика)
+- `Update-CertificatesV2_Core.ps1` — ядро обновления
+- `Install-AvestComponents.ps1` — установка компонентов Авест
+- `Install-AvCMXWebP.ps1` — установка плагина
+- `Create-ScheduledTaskV2.ps1` — настройка автозапуска
+- `Deploy-CertificateManagerV2.ps1` — развёртывание
+- `Common-Functions.ps1` — общий модуль
 
 ---
 
-## 3. Подробное описание каждого скрипта
+## 3. Описание скриптов
 
-### 3.1. CertificateManagerV2.ps1 — Главный графический интерфейс
+### 3.1. CertificateManagerV2.ps1 — GUI
 
-**Назначение:** Единая точка входа для пользователя. Предоставляет графический интерфейс для всех операций.
+Графический интерфейс на Windows Forms. При запуске сворачивает консоль. Кнопки разделены на две колонки: основные операции (синие) и вспомогательные (светлые). Блокировка повторных нажатий, цветовая индикация статуса.
 
-**Технические особенности:**
-- Использует Windows Forms для создания GUI
-- При запуске сворачивает консольное окно PowerShell
-- Блокирует повторные нажатия кнопок во время выполнения операций
-- Цветовая индикация статуса
+**Переменные блокировки:** `$schedulerRunning`, `$updateRunning`, `$installRunning`, `$folderWindowOpen`, `$urlFileOpen`, `$avestInstallRunning`
 
-**Структура интерфейса:**
-```
-┌─────────────────────────────────────────────────────────────┐
-│              Менеджер сертификатов V2.0                     │
-├─────────────────────────────────────────────────────────────┤
-│                    Статус: Готов                            │
-├───────────────────────────────┬─────────────────────────────┤
-│                               │                             │
-│  [Обновить сертификаты]       │  [URL сертификатов]         │
-│                               │                             │
-│  [Установить компоненты       │  [Инфо о компонентах]       │
-│   Авест]                      │                             │
-│                               │                             │
-│  [Установить плагин           │  [Информация о плагине]     │
-│   AvCMXWebP]                  │                             │
-│                               │                             │
-│  [Запланировать автозапуск]   │  [Открыть папку]            │
-│                               │                             │
-│                               │                             │
-│            [Выход]            │                             │
-├───────────────────────────────┴─────────────────────────────┤
-│              Версия 2.0 | Инструмент управления             │
-└─────────────────────────────────────────────────────────────┘
-```
+### 3.2. Common-Functions.ps1 — Общий модуль
 
-**Ключевые переменные блокировки:**
-```powershell
-$schedulerRunning = $false      # Автозапуск
-$updateRunning = $false         # Обновление сертификатов
-$installRunning = $false        # Установка плагина
-$folderWindowOpen = $false      # Проводник
-$urlFileOpen = $false           # Редактор URL
-$avestInstallRunning = $false   # Установка компонентов Авест
-```
+**Логирование:** `Write-Log`, `Write-ExitLog`, глобальные переменные `$script:NormalExit`, `$script:LogPath`, обработчик `PowerShell.Exiting`, перехват `trap`
 
-**Запускаемые скрипты:**
-| Кнопка                       | Вызываемый скрипт                 | Параметры                         |
-|------------------------------|-----------------------------------|-----------------------------------|
-| Обновить сертификаты         | Update-OnlyCertificates.ps1       | -                                 |
-| Установить компоненты Авест  | Install-AvestComponents.ps1       | -ScriptPath                       |
-| Установить плагин            | Install-AvCMXWebP.ps1             | -ScriptPath, -LogsFolder          |
-| Запланировать автозапуск     | Create-ScheduledTaskV2.ps1        | -                                 |
----
+**Сетевые функции:** `Test-InternetConnection` (DNS + TCP + ping), `Save-FileWithFallback` (скачивание с резервными URL)
 
-### 3.2. Common-Functions.ps1 — Общий модуль функций
+**Архивы:** `Get-WinRARPath` (поиск WinRAR), `Expand-Archive` (ZIP, RAR через WinRAR)
 
-**Назначение:** Предоставляет общие функции для всех скриптов проекта.
+**Конфигурация:** `Import-Config` (INI → хеш-таблица)
 
-**Структура модуля:**
+**Подтверждение:** `Confirm-Action` (д/н)
 
-```powershell
-# ======================================================
-# 1. ЛОГИРОВАНИЕ
-# ======================================================
-```
+**Проверка компонентов Авест:** `Test-AvPass`, `Test-AvBign`, `Test-AvCSPBel`, `Test-AvCSPBign`, `Test-AvReg` (файловая система + реестр)
 
-| Функция           | Параметры                | Назначение                                          |
-|-------------------|--------------------------|-----------------------------------------------------|
-| Write-Log         | Message, LogFile         | Запись сообщения в лог-файл с временной меткой      |
-| Write-ExitLog     | Message                  | Запись сообщения при завершении скрипта             |
+### 3.3. Update-OnlyCertificates.ps1
 
-**Глобальные переменные:**
-```powershell
-$script:NormalExit = $false      # Флаг нормального завершения
-$script:LogPath = $null          # Путь к текущему лог-файлу
-```
+Скачивание и установка сертификатов/CRL без компонентов Авест. Параметр `-ResultFile`. Коды возврата: 0 — успех, 1 — ошибка.
 
-**Обработчик завершения:**
-```powershell
-Register-EngineEvent -SourceIdentifier PowerShell.Exiting -SupportEvent -Action {...}
-```
-Срабатывает при закрытии окна PowerShell. Записывает в лог и завершает процесс с кодом 0.
+### 3.4. Update-CertificatesV2_Core.ps1 — Ядро
 
-**Перехват ошибок:**
-```powershell
-trap {
-    if (-not $script:NormalExit) {
-        Write-ExitLog -Message "СКРИПТ ЗАВЕРШЕН С ОШИБКОЙ: $_"
-    }
-    exit 1
-}
-```
+- Создание папок `logs`, `downloads`, временной папки
+- Поиск `AvCmUt4.exe` и `MngCert.exe` в `AvPCM_nces`, `AvPCM_ncesBign`, `AvPCM`
+- Чтение `all_certs_urls.txt` (пропуск пустых строк и `#`)
+- Скачивание файлов во временную папку
+- Импорт: `.cer` → Root/CA (приоритет: MngCert.exe → certutil → .NET fallback), `.crl` → AvCmUt4.exe → certutil, `.p7b` → certutil
+- Сохранение копий в `downloads`
+- Вывод результата в JSON при указании `-ResultFile`
+- Очистка временных файлов, удаление `AvCmUt4.log`
 
-```powershell
-# ======================================================
-# 3. СЕТЕВЫЕ ФУНКЦИИ
-# ======================================================
-```
+### 3.5. Install-AvestComponents.ps1
 
-| Функция                      | Параметры                   | Возврат      | Назначение                                         |
-|------------------------------|-----------------------------|--------------|----------------------------------------------------|
-| Test-InternetConnection      | -                           | $true/$false | Проверка доступа к интернету через DNS, TCP и ping |
-| Download-FileWithFallback    | $Config, $DestinationFolder | $true/$false | Скачивание файла с поддержкой резервных URL        |
+Интерактивная установка компонентов. Параметр `-ScriptPath`. Алгоритм:
+1. Проверка статуса компонентов
+2. Вывод цветной таблицы
+3. Предупреждение об антивирусе
+4. Меню выбора (1-5, 0 — выход)
+5. Для выбранного компонента: проверка архива → скачивание (если нет и есть интернет) → распаковка → поиск установщика (рекурсивно для AvPass/AvBign) → запуск
+6. Повтор до выбора 0
 
-**Алгоритм Test-InternetConnection:**
-1. Проверка DNS для доменных имён
-2. Проверка TCP-соединения (порт 443 для HTTP, 53 для IP)
-3. Если не удалось — попытка ping до nces.by
+### 3.6. Install-AvCMXWebP.ps1
 
-**Алгоритм Download-FileWithFallback:**
-1. Проверка существования файла
-2. Сборка списка URL (основной + резервные)
-3. Последовательные попытки скачивания
-4. При успехе — возврат `$true`, иначе `$false`
+Автоматическая установка плагина. Параметры: `-ScriptPath`, `-LogsFolder`.
 
-```powershell
-# ======================================================
-# 4. ФУНКЦИИ РАБОТЫ С АРХИВАМИ
-# ======================================================
-```
+Алгоритм поиска:
+1. Поиск в `avest\unpacked\AvPKISetup(*)\data\AvCMXWebP-*.exe` (рекурсивно) — функция `Search-InUnpacked`
+2. Поиск в сетевой папке (если настроена) — функция `Copy-FromNetwork`
+3. Проверка интернета → загрузка и распаковка AvPass (только распаковка!) → повторный поиск
+4. Если не помогло — загрузка и распаковка AvBign
+5. Установка найденного установщика
 
-| Функция           | Параметры                     | Возврат           | Назначение                  |
-|-------------------|-------------------------------|-------------------|-----------------------------|
-| Get-WinRARPath    | -                             | Путь или $null    | Поиск установленного WinRAR |
-| Extract-Archive   | $ArchivePath, $DestinationPath| $true/$false      | Распаковка ZIP и RAR архивов|
+### 3.7. Create-ScheduledTaskV2.ps1
 
-**Поддерживаемые форматы:**
-- **ZIP** — через встроенный `Expand-Archive`
-- **RAR** — через WinRAR (требуется установка)
+Создание задачи в планировщике: имя `UpdateCertificatesV2`, триггер — при старте системы, задержка 2 минуты, пользователь SYSTEM, права HIGHEST. Создаётся временный скрипт-обёртка с проверкой интернета (до 10 попыток, 5 минут), который запускает `Update-OnlyCertificates.ps1`.
 
-```powershell
-# ======================================================
-# 5. КОНФИГУРАЦИЯ
-# ======================================================
-```
+### 3.8. Deploy-CertificateManagerV2.ps1
 
-| Функция        | Параметры       | Возврат        | Назначение                         |
-|----------------|-----------------|----------------|------------------------------------|
-| Load-Config    | $ConfigFile     | [hashtable]    | Загрузка INI-файлов конфигурации   |
-
-**Формат INI-файла:**
-```ini
-[SectionName]
-Key1=Value1
-Key2=Value2
-
-[AnotherSection]
-Key3=Value3
-```
-
-**Результат в виде хеш-таблицы:**
-```powershell
-$config = @{
-    "SectionName" = @{ Key1 = "Value1"; Key2 = "Value2" }
-    "AnotherSection" = @{ Key3 = "Value3" }
-}
-```
-
-```powershell
-# ======================================================
-# 6. ЗАПРОС ПОДТВЕРЖДЕНИЯ
-# ======================================================
-```
-
-| Функция          | Параметры     | Возврат        | Назначение                  |
-|------------------|---------------|----------------|-----------------------------|
-| Confirm-Action   | $Message      | $true/$false   | Запрос подтверждения (д/н)  |
-
-```powershell
-# ======================================================
-# 7. ПРОВЕРКА КОМПОНЕНТОВ АВЕСТ
-# ======================================================
-```
-
-| Функция             | Проверяет                            | Методы проверки               |
-|---------------------|--------------------------------------|-------------------------------|
-| Check-AvPass        | Комплект Абонента АВЕСТ              | Файловая система + реестр     |
-| Check-AvBign        | Комплект Абонента АВЕСТ (Bign)       | Файловая система + реестр     |
-| Check-AvCSPBel      | Криптопровайдер AvCSPBel             | Файловая система + реестр     |
-| Check-AvCSPBign     | Криптопровайдер AvCSPBign            | Файловая система + реестр     |
-| Check-AvReg         | Реестровые настройки SAI DLL         | Проверка ключей реестра       |
-
-
-**Пути для проверки AvPass:**
-```
-C:\Program Files\Avest\AvPCM\AvPCM.exe
-C:\Program Files (x86)\Avest\AvPCM\AvPCM.exe
-C:\Program Files\Avest\AvPCM_nces\AvPCM.exe
-C:\Program Files (x86)\Avest\AvPCM_nces\AvPCM.exe
-C:\Program Files\Avest\AvPCM_nces\MngCert.exe
-C:\Program Files (x86)\Avest\AvPCM_nces\MngCert.exe
-C:\Program Files\Avest\AvPCM_nces\AvCmUt4.exe
-C:\Program Files (x86)\Avest\AvPCM_nces\AvCmUt4.exe
-```
-
-**Пути для проверки AvBign:**
-```
-C:\Program Files\Avest\AvPCM\AvBign.exe
-C:\Program Files (x86)\Avest\AvPCM\AvBign.exe
-C:\Program Files\Avest\AvPCM_nces\AvBign.exe
-C:\Program Files (x86)\Avest\AvPCM_nces\AvBign.exe
-C:\Program Files\Avest\AvPCM_ncesBign\AvBign.exe
-C:\Program Files (x86)\Avest\AvPCM_ncesBign\AvBign.exe
-C:\Program Files\Avest\AvPCM_ncesBign\MngCert.exe
-C:\Program Files (x86)\Avest\AvPCM_ncesBign\MngCert.exe
-C:\Program Files\Avest\AvPCM_ncesBign\AvCmUt4.exe
-C:\Program Files (x86)\Avest\AvPCM_ncesBign\AvCmUt4.exe
-```
-
-**Пути для проверки AvCSPBel:**
-```
-C:\Program Files\Avest\Avest CSP Bel\AvCSPr.dll
-C:\Program Files (x86)\Avest\Avest CSP Bel\AvCSPr.dll
-C:\Program Files\Avest\Avest CSP Bel\AvCSPBel.dll
-C:\Program Files (x86)\Avest\Avest CSP Bel\AvCSPBel.dll
-```
-
-**Пути для проверки AvCSPBign:**
-```
-C:\Program Files\Avest\Avest CSP Bign\AvCSPr.dll
-C:\Program Files (x86)\Avest\Avest CSP Bign\AvCSPr.dll
-C:\Program Files\Avest\Avest CSP Bign\AvCSPBign.dll
-C:\Program Files (x86)\Avest\Avest CSP Bign\AvCSPBign.dll
-```
-
-**Ключи реестра для AvReg:**
-```
-HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows
-    LoadAppInit_DLLs = 1
-    RequireSignedAppInit_DLLs = 0
-HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows NT\CurrentVersion\Windows
-    LoadAppInit_DLLs = 1
-    RequireSignedAppInit_DLLs = 0
-```
+Развёртывание из сетевой папки. Создаёт структуру папок, копирует файлы, создаёт ярлык на рабочем столе, настраивает автозапуск, через 5 секунд запускает GUI.
 
 ---
 
-### 3.3. Update-OnlyCertificates.ps1 — Обновление сертификатов
+## 4. Структура папок
 
-**Назначение:** Скачивание и установка сертификатов и CRL без установки компонентов Авест.
-
-**Параметры:**
-| Параметр       | Тип        | Назначение                              |
-|----------------|------------|-----------------------------------------|
-| -ResultFile    | string     | Путь для сохранения результата в JSON   |
-
-**Коды возврата:**
-| Код   | Значение                                         |
-|-------|--------------------------------------------------|
-| 0     | Успешное завершение                              |
-| 1     | Ошибка (проблемы с загрузкой или импортом)       |
-
-**Алгоритм:**
-1. Проверка прав администратора
-2. Поиск скрипта `Update-CertificatesV2_Core.ps1`
-3. Запуск с передачей параметра `-ResultFile`
-4. Возврат кода выполнения
-
-**Обработчик завершения:**
-```powershell
-Register-EngineEvent -SourceIdentifier PowerShell.Exiting -SupportEvent -Action {
-    if (-not $script:NormalExit) {
-        [Environment]::Exit(0)
-    }
-} | Out-Null
-```
-
----
-
-### 3.4. Update-CertificatesV2_Core.ps1 — Ядро обновления сертификатов
-
-**Назначение:** Основной скрипт для скачивания и установки сертификатов и CRL.
-
-**Параметры:**
-| Параметр           | Тип        | Назначение                              |
-|--------------------|------------|-----------------------------------------|
-| -ФайлРезультата    | string     | Путь для сохранения результата в JSON   |
-
-**Алгоритм работы (пошагово):**
-
-**Шаг 1: Создание папок**
-```powershell
-$папкаЛогов = Join-Path $путьСкрипта "logs"
-$папкаЗагрузок = Join-Path $путьСкрипта "downloads"
-$временнаяПапка = Join-Path $env:TEMP "cert_import_$(Get-Random)"
-```
-
-**Шаг 2: Поиск утилит AvCmUt4.exe и MngCert.exe**
-```powershell
-$возможныеПути = @(
-    "C:\Program Files\Avest\AvPCM_nces\AvCmUt4.exe",
-    "C:\Program Files (x86)\Avest\AvPCM_nces\AvCmUt4.exe",
-    "C:\Program Files\Avest\AvPCM_ncesBign\AvCmUt4.exe",
-    "C:\Program Files (x86)\Avest\AvPCM_ncesBign\AvCmUt4.exe",
-    "C:\Program Files\Avest\AvPCM\AvCmUt4.exe",
-    "C:\Program Files (x86)\Avest\AvPCM\AvCmUt4.exe"
-)
-```
-Если AvCmUt4.exe найден, ищем MngCert.exe в той же папке.
-
-**Шаг 3: Чтение файла all_certs_urls.txt**
-```powershell
-$ссылки = Get-Content $файлСсылок | Where-Object { $_ -and !$_.StartsWith("#") }
-```
-Пропускаются:
-- Пустые строки
-- Строки, начинающиеся с `#`
-
-**Шаг 4: Скачивание файлов**
-```powershell
-function СкачатьФайл {
-    param([string]$ссылка, [string]$путьСохранить)
-    try {
-        $заголовки = @{ "User-Agent" = "Mozilla/5.0 ..." }
-        Invoke-WebRequest -Uri $ссылка -Headers $заголовки -OutFile $путьСохранить -TimeoutSec 10
-        return $true
-    } catch {
-        return $false
-    }
-}
-```
-
-**Шаг 5: Импорт сертификатов (.cer)**
-```powershell
-function ИмпортСертификата {
-    # Определение хранилища (Root для корневых, CA для остальных)
-    if ($имяФайла -like "*root*" -or $имяФайла -match "kuc|mns_root") {
-        $хранилище = "Root"
-    } else {
-        $хранилище = "CA"
-    }
-    
-    # Приоритет: MngCert.exe → certutil → .NET fallback
-}
-```
-
-**Импорт CRL (.crl)**
-```powershell
-function ИмпортCRL {
-    # Приоритет: AvCmUt4.exe → certutil
-    # AvCmUt4.exe возвращает код 18 для уже существующих CRL
-}
-```
-
-**Импорт контейнеров (.p7b)**
-```powershell
-function ИмпортP7B {
-    certutil -addstore CA $путьФайла
-}
-```
-
-**Шаг 6: Сохранение результата в JSON**
-```json
-{
-    "Success": 42,
-    "Errors": 0,
-    "Total": 42,
-    "LogFile": "C:\\CMV2\\logs\\import_2024-01-01_12-00-00.log",
-    "Timestamp": "2024-01-01 12:00:00",
-    "AvCmUt4": "Найден",
-    "MngCert": "Найден",
-    "IntegrityCheck": "Пройдена"
-}
-```
-
----
-
-### 3.5. Install-AvestComponents.ps1 — Установка компонентов Авест
-
-**Назначение:** Интерактивная установка/переустановка компонентов Авест.
-
-**Параметры:**
-| Параметр        | Тип        | Назначение                       |
-|-----------------|------------|----------------------------------|
-| -ScriptPath     | string     | Путь к папке со скриптами        |
-
-**Доступные компоненты:**
-| №   | Компонент     | Описание                                                 |
-|-----|---------------|----------------------------------------------------------|
-| 1   | AvPass        | Комплект Абонента АВЕСТ (ГОСТ 28147-89, 34.10-2001)      |
-| 2   | AvBign        | Комплект Абонента АВЕСТ (ГОСТ 34.10-2012)                |
-| 3   | AvCSPBel      | Криптопровайдер АВЕСТ CSP Bel                            |
-| 4   | AvCSPBign     | Криптопровайдер АВЕСТ CSP Bign                           |
-| 5   | AvReg         | Реестровые настройки SAI DLL                             |
-
-**Алгоритм работы:**
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ 1. Проверка статуса компонентов (Check-AvPass и т.д.)       │
-└─────────────────────────────────────────────────────────────┘
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 2. Вывод таблицы статусов (цветная)                         │
-└─────────────────────────────────────────────────────────────┘
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 3. Предупреждение об антивирусе (пауза 3 сек)               │
-└─────────────────────────────────────────────────────────────┘
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 4. Интерактивное меню выбора компонента                     │
-│    Пользователь вводит номер (1-5) или 0 для выхода         │
-└─────────────────────────────────────────────────────────────┘
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 5. Для выбранного компонента:                               │
-│    а) Проверка наличия архива в avest\archives\             │
-│    б) Если нет и есть интернет — скачивание                 │
-│    в) Распаковка в avest\unpacked\                          │
-│    г) Поиск установщика (рекурсивно для AvPass/AvBign)      │
-│    д) Запуск установщика с ожиданием                        │
-└─────────────────────────────────────────────────────────────┘
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 6. Повтор меню до выбора 0                                  │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Особенности для AvPass/AvBign:**
-```powershell
-# Рекурсивный поиск AvPKISetup2.exe
-$found = Get-ChildItem -Path $unpackedPath -Recurse -Filter "AvPKISetup2.exe" | Select-Object -First 1
-```
-
-**Особенности для AvReg:**
-- Установщик — `.reg` файл
-- Запускается через `Start-Process` с параметром `/s` (тихий режим)
-
----
-
-### 3.6. Install-AvCMXWebP.ps1 — Установка плагина AvCMXWebP
-
-**Назначение:** Автоматическая установка плагина для работы с порталами в IE Mode.
-
-**Параметры:**
-| Параметр        | Тип        | Назначение                       |
-|-----------------|------------|----------------------------------|
-| -ScriptPath     | string     | Путь к папке со скриптами        |
-| -LogsFolder     | string     | Путь к папке для логов           |
-
-**Алгоритм поиска установщика:**
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Шаг 1: Поиск в распакованных компонентах                    │
-│        avest\unpacked\AvPKISetup(*)\data\AvCMXWebP-*.exe    │
-└─────────────────────────────────────────────────────────────┘
-                              ▼
-                    ┌─────────────────┐
-                    │ Найден? → ДА    │ → Установка
-                    └─────────────────┘
-                              │ НЕТ
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Шаг 2: Поиск в сетевой папке                                │
-│        \\asup-7\BackBox\DEV\CertificateManager V2.0\...     │
-└─────────────────────────────────────────────────────────────┘
-                              ▼
-                    ┌─────────────────┐
-                    │ Найден? → ДА    │ → Установка
-                    └─────────────────┘
-                              │ НЕТ
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Шаг 3: Проверка интернета                                   │
-└─────────────────────────────────────────────────────────────┘
-                              ▼
-                    ┌─────────────────┐
-                    │ Есть? → НЕТ     │ → Ошибка с инструкцией
-                    └─────────────────┘
-                              │ ДА
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Шаг 4: Скачивание и распаковка AvPass (bel)                 │
-│        (ТОЛЬКО РАСПАКОВКА, БЕЗ УСТАНОВКИ!)                  │
-└─────────────────────────────────────────────────────────────┘
-                              ▼
-                    ┌─────────────────┐
-                    │ Найден? → ДА    │ → Установка
-                    └─────────────────┘
-                              │ НЕТ
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Шаг 5: Скачивание и распаковка AvBign (bign)                │
-│        (ТОЛЬКО РАСПАКОВКА, БЕЗ УСТАНОВКИ!)                  │
-└─────────────────────────────────────────────────────────────┘
-                              ▼
-                    ┌─────────────────┐
-                    │ Найден? → ДА    │ → Установка
-                    └─────────────────┘
-                              │ НЕТ
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ ОШИБКА: Установщик не найден после всех попыток             │
-│ Вывод подробной инструкции по ручной установке              │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Ссылки для скачивания:**
-| Компонент | Основная | Резервная 1   | Резервная 2         |
-|-----------|----------|---------------|---------------------|
-| AvPass    | nces.by  | goszakupki.by | portal.nalog.gov.by |
-| AvBign    | nces.by  | goszakupki.by | portal.nalog.gov.by |
-
-**Проверка установки:**
-```powershell
-function Check-PluginInstalled {
-    # Проверка в реестре
-    $regPaths = @(
-        "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*",
-        "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*",
-        "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*"
-    )
-    
-    # Проверка файловой системы
-    $filePaths = @(
-        "C:\Program Files\Avest\AvCMXWebP\AvCMXWebP.exe",
-        "C:\Program Files (x86)\Avest\AvCMXWebP\AvCMXWebP.exe",
-        "C:\ProgramData\Avest\AvCMXWebP\x64\npAvCMXWebP.dll"
-    )
-}
-```
-
----
-
-### 3.7. Create-ScheduledTaskV2.ps1 — Настройка автозапуска
-
-**Назначение:** Создание задачи в планировщике Windows для автоматического обновления сертификатов.
-
-**Параметры задачи:**
-| Параметр         | Значение                                   |
-|------------------|--------------------------------------------|
-| Имя задачи       | UpdateCertificatesV2                       |
-| Триггер          | При старте системы (/sc onstart)           |
-| Задержка         | 2 минуты (/delay 0002:00)                  |
-| Пользователь     | SYSTEM (/ru SYSTEM)                        |
-| Уровень прав     | HIGHEST (/rl HIGHEST)                      |
-
-**Создаваемая обёртка (временный скрипт):**
-```powershell
-# Временный скрипт для проверки сети и запуска обновления V2.0
-$updateScriptPath = "путь_к_Update-OnlyCertificates.ps1"
-$logFile = "путь_к_логу"
-
-function Test-Internet {
-    $testUrls = @(
-        "https://goszakupki.by",
-        "https://nces.by",
-        "https://www.portal.nalog.gov.by",
-        "https://1.1.1.1"
-    )
-    # Проверка каждого URL
-}
-
-# Проверка интернета с ожиданием до 5 минут
-$internetAvailable = Test-Internet
-$attempt = 1
-$maxAttempts = 10
-
-while (-not $internetAvailable -and $attempt -le $maxAttempts) {
-    Start-Sleep -Seconds 30
-    $internetAvailable = Test-Internet
-    $attempt++
-}
-
-if ($internetAvailable) {
-    & $updateScriptPath
-}
-```
-
-**Команда создания задачи:**
-```powershell
-schtasks /create /tn $taskName `
-    /tr "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$tempScript`"" `
-    /sc onstart `
-    /delay 0002:00 `
-    /ru SYSTEM `
-    /rl HIGHEST `
-    /f
-```
-
----
-
-### 3.8. Deploy-CertificateManagerV2.ps1 — Развертывание
-
-**Назначение:** Автоматическое развертывание всего комплекса на локальный компьютер.
-
-**Параметры (встроенные):**
-| Переменная    | Значение                              | Назначение                    |
-|---------------|---------------------------------------|-------------------------------|
-| $source       | D:\BackBox\DEV\CertificateManager V2.0| Сетевая папка-источник        |
-| $target       | C:\CertificateManager V2.0            | Целевая папка                 |
-**Структура папок для создания:**
-```powershell
-$foldersToCreate = @(
-    "logs",           # Логи операций
-    "downloads",      # Кэш скачанных сертификатов
-    "config",         # Конфигурационные файлы
-    "avest\archives", # Архивы компонентов Авест
-    "avest\unpacked"  # Распакованные компоненты
-)
-```
-
-**Файлы для копирования:**
-| Группа | Файлы                                                                                                         |
-|--------|---------------------------------------------------------------------------------------------------------------|
-| Скрипты| CertificateManagerV2.ps1, *Certificates*.ps1, *Install*.ps1, Create-ScheduledTaskV2.ps1, Common-Functions.ps1 |
-| Данные | all_certs_urls.txt                                                                                            |
-| Конфиги| avest_urls.ini (в папку config\)                                                                              |
-
-**Создание ярлыка:**
-```powershell
-$shortcut.TargetPath = "powershell.exe"
-$shortcut.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Normal -File `"$targetScript`""
-$shortcut.WorkingDirectory = $target
-$shortcut.IconLocation = "powershell.exe,0"
-```
-
----
-
-## 4. Структура папок и назначение
-
-### 4.1. Полная структура после развертывания
-
-```
 C:\CertificateManager V2.0\
-│
-├── 📁 logs\                                       # Логи всех операций
-│   ├── import_2024-01-01_12-00-00.log             # Логи обновления сертификатов
-│   ├── avest_install_2024-01-01_12-00-00.log      # Логи установки компонентов
-│   ├── avcmxwebp_install_2024-01-01_12-00-00.log  # Логи установки плагина
-│   └── autostart_2024-01-01.log                   # Логи автозапуска
-│
-├── 📁 downloads\                                  # Кэш скачанных сертификатов
-│   ├── kuc2.cer
-│   ├── kuc.crl
-│   └── ...
-│
-├── 📁 config\
-│   └── avest_urls.ini                             # Конфигурация компонентов Авест
-│
-├── 📁 avest\
-│   ├── 📁 archives\                               # Архивы компонентов Авест
-│   │   ├── AvPKISetup(bel).zip
-│   │   ├── AvPKISetup(bign).zip
-│   │   ├── setupAvCSPBel6.3.0.813.zip
-│   │   ├── setupAvCSPBign6.3.0.813.zip
-│   │   └── requiresai_dll.zip
-│   │
-│   └── 📁 unpacked\                       # Распакованные компоненты
-│       ├── 📁 AvPKISetup(bel)\
-│       │   ├── 📁 data\
-│       │   │   └── AvCMXWebP-*.exe        # Установщик плагина
-│       │   └── AvPKISetup2.exe            # Установщик AvPass
-│       ├── 📁 AvPKISetup(bign)\
-│       │   ├── 📁 data\
-│       │   │   └── AvCMXWebP-*.exe        # Установщик плагина
-│       │   └── AvPKISetup2.exe            # Установщик AvBign
-│       ├── setupAvCSPBel6.3.0.813.exe     # Установщик AvCSPBel
-│       ├── setupAvCSPBign6.3.0.813.exe    # Установщик AvCSPBign
-│       └── requireSAI_DLL.reg             # Реестровые настройки
-│
-├── CertificateManagerV2.ps1               # 📄 Графический интерфейс
-├── Update-OnlyCertificates.ps1            # 📄 Обновление сертификатов
-├── Update-CertificatesV2.ps1              # 📄 Полное обновление
-├── Update-CertificatesV2_Core.ps1         # 📄 Ядро обновления
-├── Install-AvestComponents.ps1            # 📄 Установка компонентов
-├── Install-AvCMXWebP.ps1                  # 📄 Установка плагина
-├── Create-ScheduledTaskV2.ps1             # 📄 Настройка автозапуска
-├── all_certs_urls.txt                     # 📄 Список URL сертификатов
-├── Common-Functions.ps1                   # 📄 Общий модуль функций
-└── Deploy-CertificateManagerV2.ps1        # 📄 Скрипт развертывания
-```
-
-### 4.2. Назначение каждой папки
-
-|Папка          |Назначение                  |Кто создаёт                                       |Права доступа                              |
-|---------------|----------------------------|--------------------------------------------------|-------------------------------------------|
-|logs\          |Хранение логов всех операций|Скрипты автоматически                             |Чтение/запись для SYSTEM, Администраторов  |
-|downloads\     |Кэш скачанных сертификатов  |Update-CertificatesV2_Core.ps1                    |Чтение/запись для SYSTEM, Администраторов  |
-|config\        |Конфигурационные файлы      |Deploy-CertificateManagerV2.ps1                   |Чтение для всех, запись для Администраторов|
-|avest\archives\|Архивы компонентов Авест    |Install-AvestComponents.ps1                       |Чтение/запись для SYSTEM, Администраторов  |
-|avest\unpacked\|Распакованные компоненты    |Install-AvestComponents.ps1, Install-AvCMXWebP.ps1|Чтение/запись для SYSTEM, Администраторов  |
+├── logs\                    # Логи
+├── downloads\               # Кэш сертификатов
+├── config\                  # avest_urls.ini
+├── avest\
+│   ├── archives\            # Архивы компонентов
+│   └── unpacked\            # Распакованные компоненты
+├── CertificateManagerV2.ps1
+├── Update-OnlyCertificates.ps1
+├── Update-CertificatesV2.ps1
+├── Update-CertificatesV2_Core.ps1
+├── Install-AvestComponents.ps1
+├── Install-AvCMXWebP.ps1
+├── Create-ScheduledTaskV2.ps1
+├── all_certs_urls.txt
+├── Common-Functions.ps1
+└── Deploy-CertificateManagerV2.ps1
 
 ---
 
 ## 5. Конфигурационные файлы
 
-### 5.1. all_certs_urls.txt — Список URL сертификатов
+### 5.1. all_certs_urls.txt
 
-**Формат:**
-```
-# Комментарии начинаются с #
-# Пустые строки игнорируются
+Список URL для скачивания. Строки, начинающиеся с `#`, игнорируются. Поддерживаются `.cer`, `.crl`, `.p7b`.
 
-https://example.com/certificate.cer
-https://example.com/crl.crl
-https://example.com/container.p7b
-```
+**Содержит ссылки на:**
+- НЦЭУ / ГосСУОК — сертификаты и CRL
+- НЦЭП — сертификаты и CRL
+- МНС — сертификаты и CRL
+- Дополнительные сертификаты
 
-**Текущее содержимое (группировка):**
+### 5.2. avest_urls.ini
 
-```ini
-# ======================================================
-# НЦЭУ / ГосСУОК - СЕРТИФИКАТЫ (.cer)
-# ======================================================
-https://nces.by/wp-content/uploads/certificates/pki/kuc2.cer
-https://nces.by/wp-content/uploads/certificates/pki/kuc.cer
-https://nces.by/wp-content/uploads/certificates/pki/kuc1.cer
-https://nces.by/wp-content/uploads/certificates/pki/ruc3.cer
-https://nces.by/wp-content/uploads/certificates/pki/ruc2.cer
-https://nces.by/wp-content/uploads/certificates/pki/ruc1.cer
-https://nces.by/wp-content/uploads/certificates/pki/ruc.cer
-https://nces.by/wp-content/uploads/certificates/pki/ruc_old.cer
-https://nces.by/wp-content/uploads/certificates/pki/cas_ruc3.cer
-https://nces.by/wp-content/uploads/certificates/pki/cas_ruc2.cer
-https://nces.by/wp-content/uploads/certificates/atrib-cert-ul.cer
-
-# ======================================================
-# НЦЭУ / ГосСУОК - СОС (.crl)
-# ======================================================
-https://nces.by/wp-content/uploads/certificates/pki/kuc2.crl
-https://nces.by/wp-content/uploads/certificates/pki/kuc1.crl
-https://nces.by/wp-content/uploads/certificates/pki/kuc.crl
-https://nces.by/wp-content/uploads/certificates/pki/ruc3.crl
-https://nces.by/wp-content/uploads/certificates/pki/ruc2.crl
-https://nces.by/wp-content/uploads/certificates/pki/ruc.crl
-https://nces.by/wp-content/uploads/certificates/pki/cas_ruc3.crl
-https://nces.by/wp-content/uploads/certificates/pki/cas_ruc2.crl
-https://nces.by/wp-content/uploads/certificates/pki/cas_ruc.crl
-
-# ======================================================
-# НЦЭП - СЕРТИФИКАТЫ, СОС (.cer, .crl)
-# ======================================================
-https://ca.nepc.by/certificates/nepc.cer
-https://ca.nepc.by/certificates/nepc.crl
-https://ca.nepc.by/certificates/acs_nepc.cer
-https://ca.nepc.by/certificates/acs_nepc.crl
-https://ca.nepc.by/certificates/ncmps2024.cer
-https://ca.nepc.by/certificates/ncmps2024.crl
-https://ca.nepc.by/certificates/acs_ncmps2024.cer
-https://ca.nepc.by/certificates/acs_ncmps2024.crl
-
-# ======================================================
-# МНС - СЕРТИФИКАТЫ (.cer)
-# ======================================================
-http://www.portal.nalog.gov.by/ca/mns_root.cer
-http://www.portal.nalog.gov.by/ca/mns_work.cer
-
-# ======================================================
-# МНС - СОС (.crl)
-# ======================================================
-http://www.portal.nalog.gov.by/ca/mns-ra.crl
-http://www.portal.nalog.gov.by/ca/mns-ca.crl
-
-# ======================================================
-# ДОПОЛНИТЕЛЬНЫЕ СЕРТИФИКАТЫ 
-# ======================================================
-http://nces.by/wp-content/uploads/certificates/rootc.cer
-http://nces.by/wp-content/uploads/certificates/verifyingc.cer
-http://e-respondent.belstat.gov.by/belstat/resources/files/pem.belstat.cer
-https://www.belstat.gov.by/upload-belstat/upload-belstat-respondent/belstat.p7b
-```
-
-### 5.2. avest_urls.ini — Конфигурация компонентов Авест
-
-**Формат:**
-```ini
-[ComponentName]
-Name=Отображаемое имя
-URL=Основная ссылка для скачивания
-FallbackURL1=Резервная ссылка 1
-FallbackURL2=Резервная ссылка 2
-FileName=Имя файла архива
-InstallerName=Путь к установщику внутри архива
-SilentArgs=Аргументы для тихой установки
-```
-
-**Секция AvPass:**
-```ini
-[AvPass]
-Name=Комплект Абонента АВЕСТ (AvPass)
-URL=https://nces.by/wp-content/uploads/gossuok/AvPKISetup(bel).zip
-FallbackURL1=
-FallbackURL2=
-FileName=AvPKISetup(bel).zip
-InstallerName=AvPKISetup(bel)\AvPKISetup2.exe
-SilentArgs=/VERYSILENT /SUPPRESSMSGBOXES /NORESTART
-```
-
-**Секция AvBign:**
-```ini
-[AvBign]
-Name=Комплект Абонента АВЕСТ (AvBign)
-URL=https://nces.by/wp-content/uploads/gossuok/AvPKISetup(bign).zip
-FallbackURL1=
-FallbackURL2=
-FileName=AvPKISetup(bign).zip
-InstallerName=AvPKISetup(bign)\AvPKISetup2.exe
-SilentArgs=/VERYSILENT /SUPPRESSMSGBOXES /NORESTART
-```
-
-**Секция AvCSPBel:**
-```ini
-[AvCSPBel]
-Name=Криптопровайдер АВЕСТ CSP Bel
-URL=https://nces.by/wp-content/uploads/gossuok/setupAvCSPBel6.3.0.813.zip
-FallbackURL1=
-FallbackURL2=
-FileName=setupAvCSPBel6.3.0.813.zip
-InstallerName=setupAvCSPBel6.3.0.813.exe
-SilentArgs=/VERYSILENT /SUPPRESSMSGBOXES /NORESTART
-```
-
-**Секция AvCSPBign:**
-```ini
-[AvCSPBign]
-Name=Криптопровайдер АВЕСТ CSP Bign
-URL=https://nces.by/wp-content/uploads/gossuok/setupAvCSPBign6.3.0.813.zip
-FallbackURL1=
-FallbackURL2=
-FileName=setupAvCSPBign6.3.0.813.zip
-InstallerName=setupAvCSPBign6.3.0.813.exe
-SilentArgs=/VERYSILENT /SUPPRESSMSGBOXES /NORESTART
-```
-
-**Секция AvReg:**
-```ini
-[AvReg]
-Name=Реестровые настройки SAI DLL
-URL=https://nces.by/wp-content/uploads/requiresai_dll.zip
-FallbackURL1=
-FallbackURL2=
-FileName=requiresai_dll.zip
-InstallerName=requireSAI_DLL.reg
-SilentArgs=/s
-```
+INI-файл с секциями: `[AvPass]`, `[AvBign]`, `[AvCSPBel]`, `[AvCSPBign]`, `[AvReg]`. Поля: `Name`, `URL`, `FallbackURL1`, `FallbackURL2`, `FileName`, `InstallerName`, `SilentArgs`.
 
 ---
 
-## 6. Алгоритмы работы
+## 6. Обработка ошибок и логирование
 
-### 6.1. Алгоритм обновления сертификатов
+**Типы логов:** `import_*.log` (сертификаты), `avest_install_*.log` (компоненты), `avcmxwebp_install_*.log` (плагин), `autostart_*.log` (автозапуск)
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      НАЧАЛО                                     │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 1. Проверка прав администратора                                 │
-│    Если нет → запрос повышения прав                             │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 2. Создание папок: logs, downloads, TEMP\cert_import_*          │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 3. Поиск AvCmUt4.exe и MngCert.exe в системе                    │
-│    Пути: AvPCM_nces, AvPCM_ncesBign, AvPCM                      │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 4. Чтение all_certs_urls.txt                                    │
-│    Фильтрация: пустые строки и строки с #                       │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 5. Для каждой ссылки:                                           │
-│    а) Определение имени файла                                   │
-│    б) Скачивание во временную папку                             │
-│    в) Копирование в папку downloads                             │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 6. Для каждого скачанного файла:                                │
-│    а) .cer → ИмпортСертификата()                                │
-│        - Определение хранилища (Root/CA)                        │
-│        - MngCert.exe → certutil → .NET fallback                 │
-│    б) .crl → ИмпортCRL()                                        │
-│        - AvCmUt4.exe → certutil                                 │
-│    в) .p7b → ИмпортP7B()                                        │
-│        - certutil -addstore CA                                  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 7. Сохранение результата в JSON (если указан -ResultFile)       │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 8. Очистка: удаление временной папки, AvCmUt4.log из TEMP       │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      КОНЕЦ                                      │
-│              Возврат кода (0 — успех, 1 — ошибка)               │
-└─────────────────────────────────────────────────────────────────┘
-```
+**Глобальный обработчик:** `Register-EngineEvent` для закрытия окна, `trap` для перехвата ошибок
 
-### 6.2. Алгоритм импорта сертификата
+**Коды возврата:** 0 — успех, 1 — ошибка
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                  ИмпортСертификата()                            │
-│           Параметры: путьФайла, имяФайла                        │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌──────────────────────────────────────────────────────────────────┐
-│ Определение хранилища:                                           │
-│   if (имяФайла -like "*root*" -or имяФайла -match "kuc|mns_root")│
-│       хранилище = "Root"                                         │
-│   else                                                           │
-│       хранилище = "CA"                                           │
-└──────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ Попытка 1: MngCert.exe                                          │
-│   параметры: /importcert /silentrun "путьФайла"                 │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                    ┌─────────────────┐
-                    │ ExitCode = 0?   │
-                    └─────────────────┘
-                      │ ДА        │ НЕТ
-                      ▼           ▼
-              ┌───────────┐ ┌─────────────────────────────────────┐
-              │ УСПЕХ     │ │ Попытка 2: certutil                 │
-              └───────────┘ │   certutil -addstore хранилище путь │
-                            └─────────────────────────────────────┘
-                                           │
-                                 ┌─────────────────┐
-                                 │ ExitCode = 0?   │
-                                 └─────────────────┘
-                                   │ ДА        │ НЕТ
-                                   ▼           ▼
-                           ┌───────────┐ ┌─────────────────────────┐
-                           │ УСПЕХ     │ │ Проверка: already exists│
-                           └───────────┘ └─────────────────────────┘
-                                           │
-                                 ┌─────────────────┐
-                                 │ already exists? │
-                                 └─────────────────┘
-                                   │ ДА        │ НЕТ
-                                   ▼           ▼
-                           ┌───────────┐ ┌─────────────────────────┐
-                           │ ИНФО      │ │ Проверка: NTE_BAD_KEYSET│
-                           └───────────┘ └─────────────────────────┘
-                                           │
-                                 ┌─────────────────┐
-                                 │ NTE_BAD_KEYSET? │
-                                 └─────────────────┘
-                                   │ ДА        │ НЕТ
-                                   ▼           ▼
-                           ┌───────────┐ ┌─────────────────────────┐
-                           │ .NET      │ │ ОШИБКА                  │
-                           │ fallback  │ └─────────────────────────┘
-                           └───────────┘
-                                   │
-                                   ▼
-                           ┌───────────┐
-                           │ УСПЕХ/    │
-                           │ ОШИБКА    │
-                           └───────────┘
-```
-
-### 6.3. Алгоритм установки компонентов Авест
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                  Install-AvestComponents.ps1                    │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 1. Проверка статуса компонентов через Check-AvPass и т.д.       │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 2. Вывод цветной таблицы статусов                               │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 3. Предупреждение об антивирусе (пауза 3 секунды)               │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 4. Цикл выбора компонентов:                                     │
-│    ┌─────────────────────────────────────────────────────────┐  │
-│    │ Меню:                                                   │  │
-│    │   1. AvPass [УСТАНОВЛЕН/НЕ УСТАНОВЛЕН]                  │  │
-│    │   2. AvBign [УСТАНОВЛЕН/НЕ УСТАНОВЛЕН]                  │  │
-│    │   3. AvCSPBel [УСТАНОВЛЕН/НЕ УСТАНОВЛЕН]                │  │
-│    │   4. AvCSPBign [УСТАНОВЛЕН/НЕ УСТАНОВЛЕН]               │  │
-│    │   5. AvReg [УСТАНОВЛЕН/НЕ УСТАНОВЛЕН]                   │  │
-│    │   0. Завершить работу                                   │  │
-│    └─────────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 5. Для выбранного компонента:                                   │
-│    а) Запрос подтверждения (если уже установлен)                │
-│    б) Проверка наличия архива в avest\archives\                 │
-│    в) Если нет и есть интернет → скачивание                     │
-│    г) Распаковка в avest\unpacked\                              │
-│    д) Поиск установщика (рекурсивно для AvPass/AvBign)          │
-│    е) Запуск установщика с ожиданием                            │
-│    ж) Обновление статуса компонента                             │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 6. Повтор меню до выбора 0                                      │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 6.4. Алгоритм установки плагина AvCMXWebP
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                  Install-AvCMXWebP.ps1                          │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 1. Проверка, установлен ли плагин (Check-PluginInstalled)       │
-│    Если установлен → запрос на переустановку                    │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 2. Поиск установщика:                                           │
-│    Шаг 1: Поиск в avest\unpacked\AvPKISetup(*)\data\            │
-│           AvCMXWebP-*.exe                                       │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                    ┌─────────────────┐
-                    │ Найден?         │
-                    └─────────────────┘
-                      │ ДА        │ НЕТ
-                      ▼           ▼
-              ┌───────────┐ ┌─────────────────────────────────────┐
-              │ Шаг 6     │ │ Шаг 2: Поиск в сетевой папке        │
-              │ Установка │ │   \\asup-7\...\avest\unpacked\      │
-              └───────────┘ └─────────────────────────────────────┘
-                                           │
-                                 ┌─────────────────┐
-                                 │ Найден?         │
-                                 └─────────────────┘
-                                   │ ДА        │ НЕТ
-                                   ▼           ▼
-                           ┌───────────┐ ┌─────────────────────────┐
-                           │ Шаг 6     │ │ Шаг 3: Проверка         │
-                           │ Установка │ │        интернета        │
-                           └───────────┘ └─────────────────────────┘
-                                           │
-                                 ┌─────────────────┐
-                                 │ Интернет есть?  │
-                                 └─────────────────┘
-                                   │ ДА        │ НЕТ
-                                   ▼           ▼
-                           ┌───────────┐ ┌─────────────────────────┐
-                           │ Шаг 4     │ │ ОШИБКА                  │
-                           │ Загрузка  │ │ Вывод инструкции        │
-                           │ AvPass    │ └─────────────────────────┘
-                           └───────────┘
-                                   │
-                                   ▼
-                           ┌───────────┐
-                           │ Распаковка│
-                           │ AvPass    │
-                           └───────────┘
-                                   │
-                                 ┌─────────────────┐
-                                 │ Найден?         │
-                                 └─────────────────┘
-                                   │ ДА        │ НЕТ
-                                   ▼           ▼
-                           ┌───────────┐ ┌─────────────────────────┐
-                           │ Шаг 6     │ │ Шаг 5: Загрузка         │
-                           │ Установка │ │        AvBign           │
-                           └───────────┘ └─────────────────────────┘
-                                   │
-                                   ▼
-                           ┌───────────┐
-                           │ Распаковка│
-                           │ AvBign    │
-                           └───────────┘
-                                   │
-                                 ┌─────────────────┐
-                                 │ Найден?         │
-                                 └─────────────────┘
-                                   │ ДА        │ НЕТ
-                                   ▼           ▼
-                           ┌───────────┐ ┌─────────────────────────┐
-                           │ Шаг 6     │ │ ОШИБКА                  │
-                           │ Установка │ │ Установщик не найден    │
-                           └───────────┘ └─────────────────────────┘
-                                   │
-                                   ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 6. Установка плагина:                                           │
-│    Start-Process -FilePath $installer.FullName -Wait            │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### 6.5. Алгоритм создания задачи автозапуска
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                  Create-ScheduledTaskV2.ps1                     │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 1. Определение пути к скрипту (Get-ScriptPath)                  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 2. Проверка существования Update-OnlyCertificates.ps1           │
-│    Если нет → ошибка с инструкцией                              │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 3. Запрос подтверждения (показ параметров задачи)               │
-│    "Продолжить? (д/н)" → если "н" → выход                       │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 4. Удаление старой задачи (если существует)                     │
-│    schtasks /delete /tn UpdateCertificatesV2 /f                 │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 5. Создание временного скрипта-обёртки в TEMP                   │
-│    Функции: Write-Log, Test-Internet                            │
-│    Логика: проверка интернета до 10 попыток (5 минут)           │
-│           → запуск Update-OnlyCertificates.ps1                  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 6. Создание задачи в планировщике:                              │
-│    schtasks /create /tn UpdateCertificatesV2                    │
-│        /tr "powershell.exe -File `"$tempScript`""               │
-│        /sc onstart /delay 0002:00 /ru SYSTEM /rl HIGHEST /f     │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│ 7. Проверка результата:                                         │
-│    Если $LASTEXITCODE -eq 0 → вывод параметров задачи           │
-│    → запуск задачи для проверки                                 │
-│    → выход с кодом 0                                            │
-│    Иначе → вывод ошибки с возможными причинами                  │
-│    → выход с кодом 1                                            │
-└─────────────────────────────────────────────────────────────────┘
-```
+**Типичные ошибки:**
+- `NTE_BAD_KEYSET` → .NET fallback
+- `already exists` → INFO, не ошибка
+- `WinRAR не найден` → инструкция по установке
+- `Нет интернета` → инструкция по ручной установке
+- `Недостаточно прав` → автоматический запрос прав
 
 ---
 
-## 7. API и функции
+## 7. Требования к системе
 
-### 7.1. Полный список функций Common-Functions.ps1
-
-| Функция                   | Параметры                     | Возврат     | Описание                          | Вызывается из                              |
-|---------------------------|-------------------------------|-------------|-----------------------------------|--------------------------------------------|
-| Write-Log                 | Message, LogFile              | void        | Запись сообщения в лог            | Все скрипты                                |
-| Write-ExitLog             | Message                       | void        | Запись сообщения при завершении   | Обработчик ошибок                          |
-| Test-InternetConnection   | -                             | bool        | Проверка доступа к интернету      | Install-AvestComponents, Install-AvCMXWebP |
-| Download-FileWithFallback | Config, DestinationFolder     | bool        | Скачивание файла с резервными URL | Install-AvestComponents                    |
-| Get-WinRARPath            | -                             | string/null | Поиск WinRAR                      | Extract-Archive                            |
-| Extract-Archive           | ArchivePath, DestinationPath  | bool        | Распаковка ZIP/RAR                | Install-AvestComponents, Install-AvCMXWebP |
-| Load-Config               | ConfigFile                    | hashtable   | Загрузка INI-файла                | Install-AvestComponents                    |
-| Confirm-Action            | Message                       | bool        | Запрос подтверждения (д/н)        | Install-AvestComponents                    |
-| Check-AvPass              | -                             | bool        | Проверка установки AvPass         | Install-AvestComponents                    |
-| Check-AvBign              | -                             | bool        | Проверка установки AvBign         | Install-AvestComponents                    |
-| Check-AvCSPBel            | -                             | bool        | Проверка установки AvCSPBel       | Install-AvestComponents                    |
-| Check-AvCSPBign           | -                             | bool        | Проверка установки AvCSPBign      | Install-AvestComponents                    |
-| Check-AvReg               | -                             | bool        | Проверка реестровых настроек      | Install-AvestComponents                    |
-
-### 7.2. Внутренние функции скриптов
-
-**Update-CertificatesV2_Core.ps1:**
-| Функция             | Параметры                  | Описание                                 |
-|---------------------|----------------------------|------------------------------------------|
-| ЗаписатьЛог         | сообщение                  | Запись в лог-файл                        |
-| СкачатьФайл         | ссылка, путьСохранить      | Скачивание файла через Invoke-WebRequest |
-| ИмпортСертификата   | путьФайла, имяФайла        | Импорт .cer с определением хранилища     |
-| ИмпортCRL           | путьФайла, имяФайла        | Импорт .crl через AvCmUt4 или certutil   |
-| ИмпортP7B           | путьФайла, имяФайла        | Импорт .p7b через certutil               |
-
-**Install-AvCMXWebP.ps1:**
-| Функция                   | Параметры                                             | Описание                                |
-|---------------------------|-------------------------------------------------------|-----------------------------------------|
-| Write-Log                 | Message                                               | Локальная версия записи в лог           |
-| Test-InternetConnection   | -                                                     | Проверка интернета (расширенная версия) |
-| Download-FileWithFallback | Urls, DestinationPath, ComponentName                  | Скачивание с резервными URL             |
-| Download-AvPass           | -                                                     | Скачивание AvPass                       |
-| Download-AvBign           | -                                                     | Скачивание AvBign                       |
-| Extract-Archive           | ArchivePath, DestinationPath, ComponentName           | Распаковка ZIP                          |
-| Find-InUnpacked           | UnpackedFolder                                        | Поиск установщика плагина               |
-| Copy-FromNetwork          | NetworkPath, TargetFolder                             | Копирование из сетевой папки            |
-| Check-PluginInstalled     | -                                                     | Проверка установки плагина              |
-| Uninstall-PreviousVersion | -                                                     | Удаление предыдущей версии              |
-| DownloadAndExtract        | ComponentType, DownloadFunc, ArchiveName, DisplayName | Обёртка для скачивания и распаковки     |
-
-**Install-AvestComponents.ps1:**
-| Функция            | Параметры                           | Описание                        |
-|--------------------|-------------------------------------|---------------------------------|
-| Install-Component  | Component, Config, ForceReinstall   | Установка отдельного компонента |
+- Windows 10 / Server 2016+
+- PowerShell 5.0+
+- Права администратора
+- 100 МБ свободного места
+- Доступ к интернету (для скачивания)
+- WinRAR (опционально, для RAR-архивов)
 
 ---
 
-## 8. Обработка ошибок и логирование
+## 8. Руководство по эксплуатации
 
-### 8.1. Система логирования
+**Запуск:** ярлык на рабочем столе или `.\CertificateManagerV2.ps1`
 
-**Структура лог-файла:**
-```
-2024-01-01 12:00:00 - Сообщение
-2024-01-01 12:00:01 - Ещё одно сообщение
-```
+**Обновление сертификатов:** кнопка "Обновить сертификаты"
 
-**Типы лог-файлов:**
-| Файл                        | Формат имени                              | Содержание                        |
-|-----------------------------|-------------------------------------------|-----------------------------------|
-| Лог обновления сертификатов | import_YYYY-MM-DD_HH-mm-ss.log            | Подробный лог скачивания и импорта|
-| Лог установки компонентов   | avest_install_YYYY-MM-DD_HH-mm-ss.log     | Лог установки AvPass, AvBign и др.|
-| Лог установки плагина       | avcmxwebp_install_YYYY-MM-DD_HH-mm-ss.log | Лог поиска и установки плагина    |
-| Лог автозапуска             | autostart_YYYY-MM-DD.log                  | Лог работы обёртки в планировщике |
+**Установка компонентов Авест:** кнопка "Установить компоненты Авест" → выбор номера (1-5)
 
-### 8.2. Глобальный обработчик ошибок
+**Установка плагина:** кнопка "Установить плагин AvCMXWebP"
 
-```powershell
-# Обработчик закрытия окна PowerShell
-Register-EngineEvent -SourceIdentifier PowerShell.Exiting -SupportEvent -Action {
-    if (-not $script:NormalExit) {
-        if ($script:LogPath) {
-            $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-            "$timestamp - СКРИПТ ЗАВЕРШЕН ПОЛЬЗОВАТЕЛЕМ (закрытие окна)" | Out-File $script:LogPath -Append
-        }
-        [Environment]::Exit(0)
-    }
-} | Out-Null
+**Настройка автозапуска:** кнопка "Запланировать автозапуск"
 
-# Перехват ошибок
-trap {
-    if (-not $script:NormalExit) {
-        Write-ExitLog -Message "СКРИПТ ЗАВЕРШЕН С ОШИБКОЙ: $_"
-    }
-    exit 1
-}
-```
+**Просмотр информации:** "Инфо о компонентах", "Информация о плагине"
 
-### 8.3. Коды возврата
+**Редактирование URL:** "URL сертификатов" (открывает Блокнот)
 
-| Скрипт                               | Код 0                    | Код 1              | Другие коды |
-|--------------------------------------|--------------------------|--------------------|-------------|
-| Update-OnlyCertificates.ps1          | Успех                    | Ошибка             | -           |
-| Update-CertificatesV2_Core.ps1       | Нет ошибок               | Есть ошибки        | -           |
-| Install-AvestComponents.ps1          | Успех                    | Ошибка             | -           |
-| Install-AvCMXWebP.ps1                | Успех                    | Ошибка             | -           |
-| Create-ScheduledTaskV2.ps1           | Задача создана           | Ошибка создания    | -           |
-| Deploy-CertificateManagerV2.ps1      | Успех                    | Ошибка             | -           |
-
-### 8.4. Типичные ошибки и их обработка
-
-| Ошибка                        | Причина                                    | Обработка                                |
-|-------------------------------|--------------------------------------------|------------------------------------------|
-| NTE_BAD_KEYSET (0x80090016)   | Проблемы с хранилищем сертификатов         | .NET fallback                            |
-| already exists                | Сертификат уже установлен                  | Не считается ошибкой, логируется как INFO|
-| WinRAR не найден              | Нет WinRAR для распаковки .rar             | Сообщение с инструкцией                  |
-| Нет доступа к интернету       | Отсутствует подключение                    | Вывод инструкции по ручной установке     |
-| Недостаточно прав             | Запуск без администратора                  | Автоматический запрос прав               |
+**Открытие папки:** "Открыть папку"
 
 ---
 
-## 9. Требования к системе
+## 9. Устранение неполадок
 
-### 9.1. Минимальные требования
+- **Ошибка "Не удается загрузить файл"** → `Set-ExecutionPolicy Bypass`
+- **Окно закрывается сразу** → Запуск от администратора
+- **Крякозябры вместо русского** → Сохранить скрипты в UTF-8 с BOM
+- **Ошибка скачивания** → Проверить интернет и доступность сайтов
+- **Не найден MngCert.exe / AvCmUt4.exe** → Установить компоненты Авест
+- **Антивирус блокирует** → Добавить папку в исключения
+- **Задача не создаётся** → Запустить от администратора
+- **Скрипт не запускается при старте** → Проверить лог `autostart_*.log`
 
-| Компонент            | Требование                                           |
-|----------------------|------------------------------------------------------|
-| Операционная система | Windows 10 / Windows Server 2016 или выше            |
-| PowerShell           | Версия 5.0 или выше                                  |
-| Права доступа        | Локальный администратор                              |
-| Свободное место      | Минимум 100 МБ                                       |
-| Доступ к интернету   | Для скачивания сертификатов и компонентов            |
-| WinRAR               | Только для распаковки RAR-архивов (опционально)      |
-
-### 9.2. Рекомендуемые требования
-
-| Компонент            | Рекомендация                                                                      |
-|----------------------|-----------------------------------------------------------------------------------|
-| Операционная система | Windows 11 / Windows Server 2022                                                  |
-| PowerShell           | Версия 7.0 или выше                                                               |
-| Свободное место      | 500 МБ (с учётом логов и кэша)                                                    |
-| Сетевая папка        | Доступ к \\asup-7\BackBox\DEV\CertificateManager V2.0 для корпоративных установок |
-| Антивирус            | Исключения для папки C:\CertificateManager V2.0                                   |
-
-### 9.3. Проверка версии PowerShell
-
-```powershell
-$PSVersionTable.PSVersion
-```
-
-### 9.4. Проверка прав администратора
-
-```powershell
-$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-$principal = [Security.Principal.WindowsPrincipal] $identity
-$isAdmin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
-
-```
-
----
-
-## 10. Процесс развертывания
-
-### 10.1. Подготовка сетевой папки
-
-1. Создать папку на сетевом ресурсе, например `D:\BackBox\DEV\CertificateManager V2.0`
-2. Скопировать все файлы проекта в эту папку
-3. Убедиться, что папка доступна для чтения целевым компьютерам
-
-### 10.2. Запуск развертывания
-
-**Способ 1: Запуск из сетевой папки**
-```powershell
-\\server\share\CertificateManager V2.0\Deploy-CertificateManagerV2.ps1
-```
-
-**Способ 2: Копирование и локальный запуск**
-```powershell
-Copy-Item "\\server\share\CertificateManager V2.0\*" "C:\Temp\CMV2\" -Recurse
-cd C:\Temp\CMV2
-.\Deploy-CertificateManagerV2.ps1
-```
-
-**Способ 3: Массовое развертывание через GPO**
-1. Создать политику запуска скриптов
-2. Указать в качестве стартового скрипта `Deploy-CertificateManagerV2.ps1`
-3. Применить к целевым компьютерам
-
-### 10.3. Что происходит во время развертывания
-
-```
-1. Проверка прав администратора
-   ↓
-2. Проверка доступности сетевой папки-источника
-   ↓
-3. Создание C:\CertificateManager V2.0\
-   ↓
-4. Создание подпапок: logs, downloads, config, avest\archives, avest\unpacked
-   ↓
-5. Копирование всех скриптов и конфигурационных файлов
-   ↓
-6. Создание ярлыка на рабочем столе
-   ↓
-7. Настройка автозапуска (запуск Create-ScheduledTaskV2.ps1)
-   ↓
-8. Автоматический запуск Менеджера сертификатов через 5 секунд
-```
-
-### 10.4. Проверка успешности развертывания
-
-```powershell
-# Проверка наличия папки
-Test-Path "C:\CertificateManager V2.0"
-
-# Проверка наличия ярлыка
-Test-Path "$env:USERPROFILE\Desktop\Менеджер сертификатов V2.0.lnk"
-
-# Проверка задачи в планировщике
-schtasks /query /tn UpdateCertificatesV2
-```
-
----
-
-## 11. Руководство по эксплуатации
-
-### 11.1. Запуск программы
-
-**Способ 1: Ярлык на рабочем столе**
-- Дважды кликнуть по ярлыку `Менеджер сертификатов V2.0`
-
-**Способ 2: Из папки программы**
-```powershell
-cd C:\CertificateManager V2.0
-.\CertificateManagerV2.ps1
-```
-
-**Способ 3: Из командной строки с правами администратора**
-```powershell
-powershell.exe -ExecutionPolicy Bypass -File "C:\CertificateManager V2.0\CertificateManagerV2.ps1"
-```
-
-### 11.2. Обновление сертификатов
-
-1. Нажать кнопку **Обновить сертификаты**
-2. Дождаться завершения процесса (откроется консольное окно)
-3. После завершения появится сообщение с результатом
-4. Проверить логи в папке `logs\` при необходимости
-
-### 11.3. Установка компонентов Авест
-
-1. Нажать кнопку **Установить компоненты Авест**
-2. В открывшейся консоли будет показан статус компонентов
-3. Ввести номер компонента для установки (1-5)
-4. Подтвердить установку (д/н)
-5. Следовать инструкциям мастера установки
-6. После завершения нажать Enter для возврата в меню
-7. Повторить для других компонентов или ввести 0 для выхода
-
-### 11.4. Установка плагина AvCMXWebP
-
-1. Нажать кнопку **Установить плагин AvCMXWebP**
-2. Дождаться поиска установщика
-3. Если плагин уже установлен — подтвердить переустановку
-4. Следовать инструкциям мастера установки
-
-### 11.5. Настройка автозапуска
-
-1. Нажать кнопку **Запланировать автозапуск**
-2. Ознакомиться с параметрами создаваемой задачи
-3. Подтвердить создание (д/н)
-4. Дождаться сообщения об успехе
-
-### 11.6. Просмотр информации
-
-**Информация о компонентах:**
-- Нажать кнопку **Инфо о компонентах**
-- Будет показан статус каждого компонента
-
-**Информация о плагине:**
-- Нажать кнопку **Информация о плагине**
-- Будет показана версия установленного плагина
-
-### 11.7. Редактирование URL сертификатов
-
-1. Нажать кнопку **URL сертификатов**
-2. Откроется Блокнот с файлом `all_certs_urls.txt`
-3. Добавить или изменить ссылки
-4. Сохранить файл (Ctrl+S)
-5. Закрыть Блокнот
-
-**Формат добавления ссылок:**
-```
-# Комментарий
-https://example.com/certificate.cer
-https://example.com/crl.crl
-```
-
-### 11.8. Открытие папки программы
-
-1. Нажать кнопку **Открыть папку**
-2. Откроется Проводник в папке `C:\CertificateManager V2.0`
-
----
-
-## 12. Устранение неполадок
-
-### 12.1. Проблемы при запуске
-
-| Проблема                                     | Причина                    | Решение                                                                 |
-|----------------------------------------------|----------------------------|-------------------------------------------------------------------------|
-| Ошибка "Не удается загрузить файл"           | Политика ExecutionPolicy   | Запустить PowerShell от администратора: Set-ExecutionPolicy Bypass      |
-| Окно закрывается сразу                       | Недостаточно прав          | Запустить от имени администратора                                       |
-| Русские символы отображаются как "крякозябры"| Кодировка файлов           | Сохранить скрипты в UTF-8 с BOM(с спецификацией)                        |
-| Не сворачивается окно PowerShell             | Ошибка в коде сворачивания | Проверить работу ShowWindow или использовать ярлык с -WindowStyle Hidden|
-
-### 12.2. Проблемы при обновлении сертификатов
-
-| Проблема                         | Причина                              | Решение                                                               |
-|----------------------------------|--------------------------------------|-----------------------------------------------------------------------|
-| Ошибка скачивания                | Нет интернета или недоступен сайт    | Проверить подключение, проверить доступность сайтов                   |
-| Ошибка импорта                   | Повреждённый файл                    | Проверить лог, удалить повреждённый файл из downloads\                |
-| NTE_BAD_KEYSET                   | Проблемы с хранилищем                | Должен сработать .NET fallback, если нет — импортировать вручную      |
-| Не найден MngCert.exe            | Не установлен AvPass                 | Установить компоненты Авест через кнопку "Установить компоненты Авест"|
-| Не найден AvCmUt4.exe            | Не установлен AvPass или AvBign      | Установить компоненты Авест                                           |
-
-### 12.3. Проблемы при установке компонентов
-
-| Проблема                     | Причина                                        | Решение                                                          |
-|------------------------------|------------------------------------------------|------------------------------------------------------------------|
-| Ошибка скачивания архива     | Нет интернета или недоступен сайт              | Скачать архив вручную и положить в avest\archives\               |
-| Не удаётся распаковать архив | Повреждённый архив или не поддерживается формат| Скачать архив заново, для RAR установить WinRAR                  |
-| Установщик не найден         | Изменилась структура архива                    | Установить компонент вручную из распакованной папки              |
-| Антивирус блокирует          | Ложное срабатывание                            | Добавить папку C:\CertificateManager V2.0 в исключения антивируса|
-
-### 12.4. Проблемы при установке плагина
-
-| Проблема                   | Причина                        | Решение                                                                |
-|----------------------------|--------------------------------|------------------------------------------------------------------------|
-| Установщик не найден       | Нет распакованных компонентов  | Установить AvPass или AvBign через кнопку "Установить компоненты Авест"|
-| Ошибка загрузки AvPass     | Нет интернета                  | Подключиться к интернету или скопировать установщик вручную            |
-| Ошибка загрузки AvBign     | Нет интернета                  | Подключиться к интернету или скопировать установщик вручную            |
-| Сетевая папка недоступна   | Нет доступа к \\asup-7         | Проверить сетевое подключение или скопировать установщик вручную       |
-
-### 12.5. Проблемы с автозапуском
-
-| Проблема                         | Причина              | Решение                                                              |
-|----------------------------------|----------------------|----------------------------------------------------------------------|
-| Задача не создаётся              | Недостаточно прав    | Запустить скрипт от имени администратора                             |
-| Задача не запускается            | Отключён планировщик | Включить службу Task Scheduler                                       |
-| Скрипт не запускается при старте | Нет интернета        | Проверить лог autostart_*.log, проверить доступность сайтов          |
-| Ошибка в логе автозапуска        | Проблемы с путями    | Проверить пути в созданной задаче через taskschd.msc                 |
-
-### 12.6. Диагностика через логи
-
-**Просмотр последних ошибок в логе:**
-```powershell
+**Диагностика:**
 Get-Content "C:\CertificateManager V2.0\logs\import_*.log" | Select-String "ОШИБКА"
-```
-
-**Просмотр последних 50 строк лога:**
-```powershell
 Get-Content "C:\CertificateManager V2.0\logs\import_*.log" -Tail 50
-```
-
-**Просмотр лога автозапуска:**
-```powershell
-Get-Content "C:\CertificateManager V2.0\logs\autostart_*.log" -Tail 20
-```
 
 ---
 
-## 13. Расширение и модификация
+## 10. Расширение и модификация
 
-### 13.1. Добавление новых источников сертификатов
+**Добавление источников сертификатов:** редактировать `all_certs_urls.txt`
 
-1. Открыть файл `all_certs_urls.txt` через кнопку **URL сертификатов**
-2. Добавить новые ссылки в конец файла
-3. Сохранить файл
-
-**Формат:**
-```
-# Новый источник
-https://new-source.by/certificate.cer
-https://new-source.by/certificate.crl
-```
-
-### 13.2. Добавление нового компонента Авест
-
-1. Добавить секцию в файл `config\avest_urls.ini`
-2. Добавить функцию проверки в `Common-Functions.ps1` (Check-NewComponent)
+**Добавление компонента Авест:**
+1. Добавить секцию в `avest_urls.ini`
+2. Добавить функцию `Test-NewComponent` в `Common-Functions.ps1`
 3. Добавить компонент в массив `$components` в `Install-AvestComponents.ps1`
 
-**Пример новой секции в avest_urls.ini:**
-```ini
-[NewComponent]
-Name=Новый компонент
-URL=https://example.com/new-component.zip
-FallbackURL1=https://backup1.example.com/new-component.zip
-FallbackURL2=
-FileName=new-component.zip
-InstallerName=setup.exe
-SilentArgs=/VERYSILENT /SUPPRESSMSGBOXES /NORESTART
-```
+**Изменение путей:** отредактировать переменные `$source`, `$target`, `$NetworkSource`
 
-**Пример функции проверки в Common-Functions.ps1:**
-```powershell
-function Check-NewComponent {
-    Write-Log -Message "Проверка NewComponent..." -LogFile $script:LogPath
-    
-    # Проверка файловой системы
-    $paths = @(
-        "C:\Program Files\Avest\NewComponent\newcomponent.exe"
-    )
-    foreach ($path in $paths) {
-        if (Test-Path $path) { 
-            Write-Log -Message "  NewComponent найден по пути: $path" -LogFile $script:LogPath
-            return $true 
-        }
-    }
-    
-    # Проверка реестра
-    # ...
-    
-    return $false
-}
-```
-
-**Добавление в Install-AvestComponents.ps1:**
-```powershell
-# В блоке проверки статуса
-$componentStatus = @{
-    "AvPass" = Check-AvPass
-    "AvBign" = Check-AvBign
-    "AvCSPBel" = Check-AvCSPBel
-    "AvCSPBign" = Check-AvCSPBign
-    "AvReg" = Check-AvReg
-    "NewComponent" = Check-NewComponent   # Новая строка
-}
-
-# В массиве компонентов
-$components = @("AvPass", "AvBign", "AvCSPBel", "AvCSPBign", "AvReg", "NewComponent")
-```
-
-### 13.3. Изменение путей установки
-
-**Пути установки компонентов Авест** — заданы в функциях `Check-AvPass`, `Check-AvBign` и т.д.
-
-**Изменение пути к сетевой папке для плагина:**
-```powershell
-# В Install-AvCMXWebP.ps1
-$NetworkSource = "\\new-server\share\CertificateManager V2.0\avest\unpacked"
-```
-
-**Изменение целевой папки развертывания:**
-```powershell
-# В Deploy-CertificateManagerV2.ps1
-$target = "D:\CustomFolder\CertificateManager"
-```
-
-### 13.4. Добавление нового источника загрузки
-
-**Для компонентов Авест (avest_urls.ini):**
-```ini
-[AvPass]
-URL=https://nces.by/.../AvPKISetup(bel).zip
-FallbackURL1=https://new-source.by/.../AvPKISetup(bel).zip
-FallbackURL2=https://another-source.by/.../AvPKISetup(bel).zip
-```
-
-**Для плагина AvCMXWebP (Install-AvCMXWebP.ps1):**
-```powershell
-$avPassUrls = @(
-    "https://nces.by/.../AvPKISetup(bel).zip",
-    "https://new-source.by/.../AvPKISetup(bel).zip",
-    "https://another-source.by/.../AvPKISetup(bel).zip"
-)
-```
-
-### 13.5. Изменение расписания автозапуска
-
-**В Create-ScheduledTaskV2.ps1:**
-```powershell
-# Изменение задержки (сейчас 2 минуты)
-/delay 0005:00   # 5 минут
-
-# Изменение триггера
-/sc daily        # Ежедневно
-/st 09:00        # В 9:00
-```
+**Изменение расписания автозапуска:** в `Create-ScheduledTaskV2.ps1` изменить `/delay` или `/sc`
 
 ---
 
-## Приложение A: Примеры использования
+## Приложение: Примеры использования
 
-### A.1. Полное обновление системы
+# Полное обновление
+.\Update-CertificatesV2.ps1 -ResultFile "C:\temp\result.json"
 
-```powershell
-# Запуск полного обновления
-.\Update-CertificatesV2.ps1 -ФайлРезультата "C:\temp\result.json"
-
-# Проверка результата
-Get-Content "C:\temp\result.json" | ConvertFrom-Json | Format-List
-```
-
-### A.2. Только обновление сертификатов
-
-```powershell
-# Обновление сертификатов
+# Только сертификаты
 .\Update-OnlyCertificates.ps1
 
-# Обновление с сохранением результата
-.\Update-OnlyCertificates.ps1 -ResultFile "C:\temp\cert_update.json"
-```
-
-### A.3. Установка компонентов Авест
-
-```powershell
-# Интерактивная установка
+# Установка компонентов
 .\Install-AvestComponents.ps1
 
-# Установка с указанием пути
-.\Install-AvestComponents.ps1 -ScriptPath "C:\CertificateManager V2.0"
-```
-
-### A.4. Установка плагина
-
-```powershell
-# Стандартная установка
+# Установка плагина
 .\Install-AvCMXWebP.ps1
 
-# Установка с указанием путей
-.\Install-AvCMXWebP.ps1 -ScriptPath "C:\CertificateManager V2.0" -LogsFolder "C:\CertificateManager V2.0\logs"
-```
-
-### A.5. Настройка автозапуска
-
-```powershell
-# Создание задачи
+# Настройка автозапуска
 .\Create-ScheduledTaskV2.ps1
 
 # Проверка задачи
 schtasks /query /tn UpdateCertificatesV2
-
-# Ручной запуск задачи
 schtasks /run /tn UpdateCertificatesV2
-
-# Удаление задачи
 schtasks /delete /tn UpdateCertificatesV2 /f
-```
 
 ---
 
-## Приложение B: Схемы и диаграммы
-
-### B.1. Общая архитектура
-
-```
-┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                              Менеджер сертификатов V2.0                                 │
-├─────────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                         │
-│  ┌─────────────────────────────┐    ┌─────────────────────────────┐                     │
-│  │     CertificateManagerV2    │    │     Deploy-Certificate      │                     │
-│  │           .ps1              │    │        ManagerV2.ps1        │                     │
-│  │      (Графический GUI)      │    │       (Развертывание)       │                     │
-│  └─────────────┬───────────────┘    └─────────────────────────────┘                     │
-│                │                                                                        │
-│                ▼                                                                        │
-│  ┌──────────────────────────────────────────────────────────────────────────────┐       │
-│  │                          Общий модуль функций                                │       │
-│  │                        Common-Functions.ps1                                  │       │
-│  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐            │       │
-│  │  │ Логир-е  │ │ Сеть     │ │ Архивы   │ │ Конфиг-я │ │ Проверка │            │       │
-│  │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────┘            │       │
-│  └──────────────────────────────────────────────────────────────────────────────┘       │
-│                │                                                                        │
-│    ┌───────────┼───────────┬───────────────┬───────────────┬───────────┐                │
-│    ▼           ▼           ▼               ▼               ▼           ▼                │
-│ ┌───────┐ ┌───────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌───────────┐             │
-│ │Update │ │Install│ │Install-   │ │Create-    │ │all_certs_ │ │avest_urls │             │
-│ │Only   │ │Avest  │ │AvCMXWebP  │ │Scheduled  │ │urls.txt   │ │.ini       │             │
-│ │.ps1   │ │.ps1   │ │.ps1       │ │TaskV2.ps1 │ │           │ │           │             │
-│ └───┬───┘ └───┬───┘ └─────┬─────┘ └─────┬─────┘ └───────────┘ └───────────┘             │
-│     │         │           │             │                                               │
-│     ▼         ▼           ▼             ▼                                               │
-│ ┌───────────────────────────────────────────────────────────────────────┐               │
-│ │                         Update-CertificatesV2_Core                    │               │
-│ │                              .ps1                                     │               │
-│ │                    (Ядро обновления сертификатов)                     │               │
-│ └───────────────────────────────────────────────────────────────────────┘               │
-│                                                                                         │
-└─────────────────────────────────────────────────────────────────────────────────────────┘
-```
-
-### B.2. Схема данных
-
-```
-┌─────────────────────────────────────────────────────────────────────────────────────────┐
-│                                 Файлы конфигурации                                      │
-├─────────────────────────────────────────────────────────────────────────────────────────┤
-│                                                                                         │
-│   all_certs_urls.txt                         avest_urls.ini                             │
-│   ┌─────────────────────────────┐           ┌──────────────────────────────┐            │
-│   │ # НЦЭУ - СЕРТИФИКАТЫ        │           │ [AvPass]                     │            │
-│   │ https://nces.by/.../kuc.cer │           │ Name=Комплект Абонента       │            │
-│   │ https://nces.by/.../kuc.crl │           │ URL=https://nces.by/...      │            │
-│   │ ...                         │           │ FileName=AvPKISetup(bel).zip │            │
-│   │ # МНС - СЕРТИФИКАТЫ         │           │ InstallerName=AvPKISetup2.exe│            │
-│   │ http://portal.nalog...      │           └──────────────────────────────┘            │
-│   └─────────────────────────────┘                                                       │
-│                                                                                         │
-│  ┌─────────────────────────────────────────────────────────────────────────────────────┐│
-│  │                              Структура папок                                        ││
-│  ├─────────────────────────────────────────────────────────────────────────────────────┤│
-│  │                                                                                     ││
-│  │  C:\CertificateManager V2.0\                                                        ││
-│  │  ├── logs\                              ← Логи операций                             ││
-│  │  ├── downloads\                         ← Кэш сертификатов                          ││
-│  │  ├── config\avest_urls.ini              ← Конфигурация компонентов                  ││
-│  │  ├── avest\archives\                    ← Архивы компонентов                        ││
-│  │  └── avest\unpacked\                    ← Распакованные компоненты                  ││
-│  │                                                                                     ││
-│  └─────────────────────────────────────────────────────────────────────────────────────┘│
-│                                                                                         │
-└─────────────────────────────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Приложение C:
-
-**Версия документации:** 2.0
-
-**Дата последнего обновления:** 30 марта 2026 г.
-
----
-
-*Документация завершена.*
+*Версия: 2.0 | Дата: 03.04.2026*
