@@ -80,12 +80,35 @@ if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 # 2. НАСТРОЙКА ПАРАМЕТРОВ
 # ======================================================
 # Источник (сетевая папка)
-$source = "D:\BackBox\DEV\CertificateManager V2.0"
+$source = "\\ASUP-7\BackBox\DEV\DEV-CM-"
 
 # Целевая папка
 $target = "C:\CertificateManager V2.0"
 
-# Список папок для создания (ИСПРАВЛЕНО: синтаксис массива)
+# ======================================================
+# 2.1. ПРОВЕРКА ДОСТУПНОСТИ ИСТОЧНИКА
+# ======================================================
+if (-not (Test-Path $source)) {
+    Write-Host ""
+    Write-Host ("="*70) -ForegroundColor Red
+    Write-Host "  ОШИБКА: Сетевая папка недоступна!" -ForegroundColor Red
+    Write-Host ("="*70) -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Путь: $source" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Проверьте:" -ForegroundColor Cyan
+    Write-Host "  1. Доступность компьютера ASUP-7 в сети" -ForegroundColor Gray
+    Write-Host "  2. Наличие общего доступа к папке BackBox" -ForegroundColor Gray
+    Write-Host "  3. Правильность пути (возможно, опечатка)" -ForegroundColor Gray
+    Write-Host ""
+    Write-Host "Нажмите Enter для выхода..." -ForegroundColor Gray
+    pause
+    exit 1
+}
+
+Write-Host "  [+] Сетевая папка доступна: $source" -ForegroundColor Green
+
+# Список папок для создания
 $foldersToCreate = @(
     "logs",
     "downloads",
