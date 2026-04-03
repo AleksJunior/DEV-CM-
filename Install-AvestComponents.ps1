@@ -59,6 +59,15 @@ param(
 )
 
 # ======================================================
+# ПРОВЕРКА ПРАВ АДМИНИСТРАТОРА
+# ======================================================
+if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+    Write-Host "Запрос прав администратора..." -ForegroundColor Yellow
+    Start-Process powershell.exe -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
+    exit
+}
+
+# ======================================================
 # 1. НАСТРОЙКА ПУТЕЙ
 # ======================================================
 if (-not $ScriptPath) {
