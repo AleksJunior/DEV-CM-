@@ -71,170 +71,170 @@ license that can be found in the LICENSE file.
 #>
 
 param(
-    [string]$ФайлРезультата
+    [string]$ResultFile
 )
 
 # ======================================================
 # 1. НАСТРОЙКА ПУТЕЙ
 # ======================================================
 if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
-    $путьСкрипта = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
+    $scriptPath = Split-Path -Parent -Path $MyInvocation.MyCommand.Definition
 } else {
-    $путьСкрипта = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
-    if (!$путьСкрипта) { $путьСкрипта = "." }
+    $scriptPath = Split-Path -Parent -Path ([Environment]::GetCommandLineArgs()[0])
+    if (!$scriptPath) { $scriptPath = "." }
 }
 
-$файлСсылок = Join-Path $путьСкрипта "all_certs_urls.txt"
-$папкаЛогов = Join-Path $путьСкрипта "logs"
-$папкаЗагрузок = Join-Path $путьСкрипта "downloads"
-$временнаяПапка = Join-Path $env:TEMP "cert_import_$(Get-Random)"
+$urlsFile = Join-Path $scriptPath "all_certs_urls.txt"
+$logsFolder = Join-Path $scriptPath "logs"
+$downloadsFolder = Join-Path $scriptPath "downloads"
+$tempFolder = Join-Path $env:TEMP "cert_import_$(Get-Random)"
 
 # ======================================================
 # 2. СОЗДАНИЕ ПАПОК
 # ======================================================
 Write-Host "Создание папок..."
-foreach ($папка in @($папкаЛогов, $папкаЗагрузок, $временнаяПапка)) {
-    if (!(Test-Path $папка)) { 
-        New-Item -ItemType Directory -Path $папка -Force | Out-Null
-        Write-Host "  + $папка"
+foreach ($folder in @($logsFolder, $downloadsFolder, $tempFolder)) {
+    if (!(Test-Path $folder)) { 
+        New-Item -ItemType Directory -Path $folder -Force | Out-Null
+        Write-Host "  + $folder"
     }
 }
 
 # ======================================================
 # 3. ФАЙЛ ЛОГА
 # ======================================================
-$файлЛога = "$папкаЛогов\import_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss').log"
-"СТАРТ: $(Get-Date)" | Out-File $файлЛога
-("="*70) | Out-File $файлЛога -Append
+$logFile = "$logsFolder\import_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss').log"
+"СТАРТ: $(Get-Date)" | Out-File $logFile
+("="*70) | Out-File $logFile -Append
 
 # ======================================================
 # 4. ФУНКЦИИ
 # ======================================================
 
-function ЗаписатьЛог {
-    param([string]$сообщение)
-    $время = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-    "$время - $сообщение" | Out-File $файлЛога -Append
+function Write-LogEntry {
+    param([string]$message)
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    "$timestamp - $message" | Out-File $logFile -Append
 }
 
-function СкачатьФайл {
-    param([string]$ссылка, [string]$путьСохранить)
+function Save-File {
+    param([string]$url, [string]$savePath)
     try {
-        $заголовки = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
-        Invoke-WebRequest -Uri $ссылка -Headers $заголовки -OutFile $путьСохранить -TimeoutSec 10 -ErrorAction Stop
+        $headers = @{ "User-Agent" = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" }
+        Invoke-WebRequest -Uri $url -Headers $headers -OutFile $savePath -TimeoutSec 10 -ErrorAction Stop
         return $true
     } catch {
         return $false
     }
 }
 
-function ИмпортСертификата {
-    param([string]$путьФайла, [string]$имяФайла)
+function Import-Certificate {
+    param([string]$filePath, [string]$fileName)
     
-    if ($имяФайла -like "*root*" -or $имяФайла -match "kuc|mns_root") {
-        $хранилище = "Root"
+    if ($fileName -like "*root*" -or $fileName -match "kuc|mns_root") {
+        $store = "Root"
     } else {
-        $хранилище = "CA"
+        $store = "CA"
     }
     
-    if ($mngcert) {
-        ЗаписатьЛог -сообщение "Пробуем MngCert.exe для $имяФайла"
-        $параметры = "/importcert /silentrun `"$путьФайла`""
+    if ($mngCert) {
+        Write-LogEntry "Пробуем MngCert.exe для $fileName"
+        $params = "/importcert /silentrun `"$filePath`""
         try {
-            $процесс = Start-Process -FilePath $mngcert -ArgumentList $параметры -Wait -PassThru -NoNewWindow -ErrorAction Stop
-            ЗаписатьЛог -сообщение "Код выхода MngCert.exe: $($процесс.ExitCode)"
-            if ($процесс.ExitCode -eq 0) {
-                ЗаписатьЛог -сообщение "ОК (MngCert.exe - $хранилище): $имяФайла"
+            $process = Start-Process -FilePath $mngCert -ArgumentList $params -Wait -PassThru -NoNewWindow -ErrorAction Stop
+            Write-LogEntry "Код выхода MngCert.exe: $($process.ExitCode)"
+            if ($process.ExitCode -eq 0) {
+                Write-LogEntry "ОК (MngCert.exe - $store): $fileName"
                 return $true
             } else {
-                ЗаписатьЛог -сообщение "MngCert.exe не сработал, пробуем certutil..."
+                Write-LogEntry "MngCert.exe не сработал, пробуем certutil..."
             }
         } catch {
-            ЗаписатьЛог -сообщение "Ошибка MngCert.exe: $($_.Exception.Message), пробуем certutil..."
+            Write-LogEntry "Ошибка MngCert.exe: $($_.Exception.Message), пробуем certutil..."
         }
     }
     
-    $вывод = certutil -addstore $хранилище $путьФайла 2>&1
-    $кодВыхода = $LASTEXITCODE
+    $output = certutil -addstore $store $filePath 2>&1
+    $exitCode = $LASTEXITCODE
     
-    if ($кодВыхода -eq 0) {
-        ЗаписатьЛог -сообщение "ОК (certutil - $хранилище): $имяФайла"
+    if ($exitCode -eq 0) {
+        Write-LogEntry "ОК (certutil - $store): $fileName"
         return $true
     }
     
-    $строкаВывода = $вывод | Out-String
-    if ($строкаВывода -match "already exists") {
-        ЗаписатьЛог -сообщение "ИНФО: Сертификат $имяФайла уже существует в хранилище $хранилище"
+    $outputString = $output | Out-String
+    if ($outputString -match "already exists") {
+        Write-LogEntry "ИНФО: Сертификат $fileName уже существует в хранилище $store"
         return $true
     }
     
-    if ($строкаВывода -match "0x80090016" -or $строкаВывода -match "NTE_BAD_KEYSET") {
-        ЗаписатьЛог -сообщение "ПРЕДУПРЕЖДЕНИЕ: NTE_BAD_KEYSET, пробуем .NET..."
+    if ($outputString -match "0x80090016" -or $outputString -match "NTE_BAD_KEYSET") {
+        Write-LogEntry "ПРЕДУПРЕЖДЕНИЕ: NTE_BAD_KEYSET, пробуем .NET..."
         try {
-            $сертификат = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2
-            $сертификат.Import($путьФайла)
-            $объектХранилища = New-Object System.Security.Cryptography.X509Certificates.X509Store($хранилище, "LocalMachine")
-            $объектХранилища.Open("ReadWrite")
-            $существующий = $объектХранилища.Certificates | Where-Object { $_.Thumbprint -eq $сертификат.Thumbprint }
-            if ($существующий) {
-                ЗаписатьЛог -сообщение "ИНФО: Сертификат уже существует"
-                $объектХранилища.Close()
+            $certificate = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2
+            $certificate.Import($filePath)
+            $storeObject = New-Object System.Security.Cryptography.X509Certificates.X509Store($store, "LocalMachine")
+            $storeObject.Open("ReadWrite")
+            $existing = $storeObject.Certificates | Where-Object { $_.Thumbprint -eq $certificate.Thumbprint }
+            if ($existing) {
+                Write-LogEntry "ИНФО: Сертификат уже существует"
+                $storeObject.Close()
                 return $true
             }
-            $объектХранилища.Add($сертификат)
-            $объектХранилища.Close()
-            ЗаписатьЛог -сообщение "ОК (.NET fallback): $имяФайла"
+            $storeObject.Add($certificate)
+            $storeObject.Close()
+            Write-LogEntry "ОК (.NET fallback): $fileName"
             return $true
         } catch {
-            ЗаписатьЛог -сообщение "ОШИБКА: .NET fallback не сработал: $_"
+            Write-LogEntry "ОШИБКА: .NET fallback не сработал: $_"
             return $false
         }
     }
     
-    ЗаписатьЛог -сообщение "ОШИБКА: $имяФайла (код certutil $кодВыхода)"
+    Write-LogEntry "ОШИБКА: $fileName (код certutil $exitCode)"
     return $false
 }
 
-function ИмпортCRL {
-    param([string]$путьФайла, [string]$имяФайла)
+function Import-CRL {
+    param([string]$filePath, [string]$fileName)
     
-    if ($avcmut) {
-        & $avcmut -C $путьФайла -NA *>$null
-        $кодВыхода = $LASTEXITCODE
+    if ($avCmUt4) {
+        & $avCmUt4 -C $filePath -NA *>$null
+        $exitCode = $LASTEXITCODE
         
-        if ($кодВыхода -eq 0 -or $кодВыхода -eq 18) {
-            ЗаписатьЛог -сообщение "ОК (AvCmUt4): $имяФайла"
+        if ($exitCode -eq 0 -or $exitCode -eq 18) {
+            Write-LogEntry "ОК (AvCmUt4): $fileName"
             return $true
         } else {
-            certutil -addstore CA $путьФайла *>$null
+            certutil -addstore CA $filePath *>$null
             if ($LASTEXITCODE -eq 0) {
-                ЗаписатьЛог -сообщение "ОК (certutil - fallback): $имяФайла"
+                Write-LogEntry "ОК (certutil - fallback): $fileName"
                 return $true
             } else {
-                ЗаписатьЛог -сообщение "ОШИБКА: $имяФайла (код $кодВыхода)"
+                Write-LogEntry "ОШИБКА: $fileName (код $exitCode)"
                 return $false
             }
         }
     } else {
-        certutil -addstore CA $путьФайла *>$null
+        certutil -addstore CA $filePath *>$null
         if ($LASTEXITCODE -eq 0) {
-            ЗаписатьЛог -сообщение "ОК (certutil): $имяФайла"
+            Write-LogEntry "ОК (certutil): $fileName"
             return $true
         } else {
-            ЗаписатьЛог -сообщение "ОШИБКА: $имяФайла (код certutil $LASTEXITCODE)"
+            Write-LogEntry "ОШИБКА: $fileName (код certutil $LASTEXITCODE)"
             return $false
         }
     }
 }
 
-function ИмпортP7B {
-    param([string]$путьФайла, [string]$имяФайла)
-    certutil -addstore CA $путьФайла *>$null
+function Import-P7B {
+    param([string]$filePath, [string]$fileName)
+    certutil -addstore CA $filePath *>$null
     if ($LASTEXITCODE -eq 0) {
-        ЗаписатьЛог -сообщение "ОК (p7b): $имяФайла"
+        Write-LogEntry "ОК (p7b): $fileName"
         return $true
     } else {
-        ЗаписатьЛог -сообщение "ОШИБКА: $имяФайла (код p7b $LASTEXITCODE)"
+        Write-LogEntry "ОШИБКА: $fileName (код p7b $LASTEXITCODE)"
         return $false
     }
 }
@@ -242,10 +242,10 @@ function ИмпортP7B {
 # ======================================================
 # 5. ПОИСК УТИЛИТ AvCmUt4.exe И MngCert.exe
 # ======================================================
-$avcmut = $null
-$mngcert = $null
+$avCmUt4 = $null
+$mngCert = $null
 
-$возможныеПути = @(
+$possiblePaths = @(
     "C:\Program Files\Avest\AvPCM_nces\AvCmUt4.exe",
     "C:\Program Files (x86)\Avest\AvPCM_nces\AvCmUt4.exe",
     "C:\Program Files\Avest\AvPCM_ncesBign\AvCmUt4.exe",
@@ -254,24 +254,24 @@ $возможныеПути = @(
     "C:\Program Files (x86)\Avest\AvPCM\AvCmUt4.exe"
 )
 
-foreach ($путь in $возможныеПути) {
-    if (Test-Path $путь) {
-        $avcmut = $путь
-        Write-Host "AvCmUt4 найден: $avcmut"
-        ЗаписатьЛог -сообщение "AvCmUt4 найден: $avcmut"
+foreach ($path in $possiblePaths) {
+    if (Test-Path $path) {
+        $avCmUt4 = $path
+        Write-Host "AvCmUt4 найден: $avCmUt4"
+        Write-LogEntry "AvCmUt4 найден: $avCmUt4"
         
-        $путьMngCert = Join-Path (Split-Path $путь) "MngCert.exe"
-        if (Test-Path $путьMngCert) {
-            $mngcert = $путьMngCert
-            Write-Host "MngCert.exe найден: $mngcert"
-            ЗаписатьЛог -сообщение "MngCert.exe найден: $mngcert"
+        $mngCertPath = Join-Path (Split-Path $path) "MngCert.exe"
+        if (Test-Path $mngCertPath) {
+            $mngCert = $mngCertPath
+            Write-Host "MngCert.exe найден: $mngCert"
+            Write-LogEntry "MngCert.exe найден: $mngCert"
         }
         break
     }
 }
 
-if (-not $mngcert) {
-    $путиMngCert = @(
+if (-not $mngCert) {
+    $mngCertPaths = @(
         "C:\Program Files\Avest\AvPCM_nces\MngCert.exe",
         "C:\Program Files (x86)\Avest\AvPCM_nces\MngCert.exe",
         "C:\Program Files\Avest\AvPCM_ncesBign\MngCert.exe",
@@ -279,34 +279,34 @@ if (-not $mngcert) {
         "C:\Program Files\Avest\AvPCM\MngCert.exe",
         "C:\Program Files (x86)\Avest\AvPCM\MngCert.exe"
     )
-    foreach ($путь in $путиMngCert) {
-        if (Test-Path $путь) {
-            $mngcert = $путь
-            Write-Host "MngCert.exe найден: $mngcert"
-            ЗаписатьЛог -сообщение "MngCert.exe найден: $mngcert"
+    foreach ($path in $mngCertPaths) {
+        if (Test-Path $path) {
+            $mngCert = $path
+            Write-Host "MngCert.exe найден: $mngCert"
+            Write-LogEntry "MngCert.exe найден: $mngCert"
             break
         }
     }
 }
 
-if (-not $avcmut) {
+if (-not $avCmUt4) {
     Write-Host "AvCmUt4 не найден, используем certutil для CRL"
-    ЗаписатьЛог -сообщение "AvCmUt4 не найден, используем certutil для CRL"
+    Write-LogEntry "AvCmUt4 не найден, используем certutil для CRL"
 }
 
-if (-not $mngcert) {
+if (-not $mngCert) {
     Write-Host "MngCert.exe не найден, используем certutil для сертификатов"
-    ЗаписатьЛог -сообщение "MngCert.exe не найден, используем certutil для сертификатов"
+    Write-LogEntry "MngCert.exe не найден, используем certutil для сертификатов"
 }
 
 # ======================================================
 # 5.1. ПРОВЕРКА ЦЕЛОСТНОСТИ (ПЕРЕМЕЩЕНО СЮДА)
 # ======================================================
 # Проверяем, найдены ли обе утилиты
-if ($avcmut -and $mngcert) {
-    $целостностьОК = $true
+if ($avCmUt4 -and $mngCert) {
+    $integrityOK = $true
 } else {
-    $целостностьОК = $false
+    $integrityOK = $false
 }
 
 # ======================================================
@@ -316,20 +316,20 @@ Write-Host ("="*70)
 Write-Host "НАЧАЛО ОБНОВЛЕНИЯ"
 Write-Host ("="*70)
 
-if (!(Test-Path $файлСсылок)) {
-    Write-Host "Файл $файлСсылок не найден!"
-    ЗаписатьЛог -сообщение "ОШИБКА: Файл со ссылками не найден: $файлСсылок"
+if (!(Test-Path $urlsFile)) {
+    Write-Host "Файл $urlsFile не найден!"
+    Write-LogEntry "ОШИБКА: Файл со ссылками не найден: $urlsFile"
     exit 1
 }
 
-if ($avcmut) {
-    Write-Host "AvCmUt4 найден: $avcmut"
+if ($avCmUt4) {
+    Write-Host "AvCmUt4 найден: $avCmUt4"
 } else {
     Write-Host "AvCmUt4 не найден, используем certutil для CRL"
 }
 
-if ($mngcert) {
-    Write-Host "MngCert.exe найден: $mngcert"
+if ($mngCert) {
+    Write-Host "MngCert.exe найден: $mngCert"
 } else {
     Write-Host "MngCert.exe не найден, используем certutil для сертификатов"
 }
@@ -337,10 +337,10 @@ if ($mngcert) {
 # ======================================================
 # 7. ЧТЕНИЕ ССЫЛОК
 # ======================================================
-$ссылки = Get-Content $файлСсылок | Where-Object { $_ -and !$_.StartsWith("#") }
-$всегоСсылок = $ссылки.Count
-Write-Host "Найдено ссылок: $всегоСсылок"
-ЗаписатьЛог -сообщение "Найдено $всегоСсылок ссылок в $файлСсылок"
+$urls = Get-Content $urlsFile | Where-Object { $_ -and !$_.StartsWith("#") }
+$totalUrls = $urls.Count
+Write-Host "Найдено ссылок: $totalUrls"
+Write-LogEntry "Найдено $totalUrls ссылок в $urlsFile"
 
 # ======================================================
 # 8. СКАЧИВАНИЕ ФАЙЛОВ
@@ -349,41 +349,41 @@ Write-Host ("`n" + ("="*70))
 Write-Host "СКАЧИВАНИЕ ФАЙЛОВ"
 Write-Host ("="*70)
 
-$скачанныеФайлы = @{}
-$количествоСкачанных = 0
+$downloadedFiles = @{}
+$downloadedCount = 0
 
-foreach ($ссылка in $ссылки) {
-    $ссылка = $ссылка.Trim()
-    if (!$ссылка) { continue }
+foreach ($url in $urls) {
+    $url = $url.Trim()
+    if (!$url) { continue }
     
-    $имяФайла = $ссылка.Split('/')[-1]
-    $временныйФайл = Join-Path $временнаяПапка $имяФайла
-    $сохраненныйФайл = Join-Path $папкаЗагрузок $имяФайла
+    $fileName = $url.Split('/')[-1]
+    $tempFile = Join-Path $tempFolder $fileName
+    $savedFile = Join-Path $downloadsFolder $fileName
     
-    $количествоСкачанных++
-    Write-Host "`n[$количествоСкачанных/$всегоСсылок] $имяФайла"
+    $downloadedCount++
+    Write-Host "`n[$downloadedCount/$totalUrls] $fileName"
     
-    if (СкачатьФайл -ссылка $ссылка -путьСохранить $временныйФайл) {
-        $размер = (Get-Item $временныйФайл).Length
-        Write-Host "  Скачано, размер: $размер байт"
-        ЗаписатьЛог -сообщение "ОК (скачивание): $имяФайла ($размер байт)"
-        Copy-Item $временныйФайл $сохраненныйФайл -Force
-        $скачанныеФайлы[$имяФайла] = @{ Path = $сохраненныйФайл }
+    if (Download-File -url $url -savePath $tempFile) {
+        $size = (Get-Item $tempFile).Length
+        Write-Host "  Скачано, размер: $size байт"
+        Write-LogEntry "ОК (скачивание): $fileName ($size байт)"
+        Copy-Item $tempFile $savedFile -Force
+        $downloadedFiles[$fileName] = @{ Path = $savedFile }
     } else {
         Write-Host "  Ошибка скачивания"
-        ЗаписатьЛог -сообщение "ОШИБКА (скачивание): $ссылка"
+        Write-LogEntry "ОШИБКА (скачивание): $url"
     }
 }
 
 # ======================================================
 # 9. ИМПОРТ ФАЙЛОВ
 # ======================================================
-$успешноСертификатов = 0
-$успешноСписков = 0
-$успешноКонтейнеров = 0
-$всегоСертификатов = 0
-$всегоСписков = 0
-$всегоКонтейнеров = 0
+$successCertificates = 0
+$successCRLs = 0
+$successContainers = 0
+$totalCertificates = 0
+$totalCRLs = 0
+$totalContainers = 0
 
 Write-Host ("`n" + ("="*70))
 Write-Host "ИМПОРТ ФАЙЛОВ"
@@ -455,26 +455,26 @@ function Close-BlockingPrograms {
 # Вызвать перед импортом
 Close-BlockingPrograms
 
-foreach ($ключ in $скачанныеФайлы.Keys) {
-    $инфо = $скачанныеФайлы[$ключ]
-    Write-Host "`n$ключ"
+foreach ($key in $downloadedFiles.Keys) {
+    $info = $downloadedFiles[$key]
+    Write-Host "`n$key"
     
-    if ($ключ -like "*.cer") {
-        $всегоСертификатов++
-        if (ИмпортСертификата -путьФайла $инфо.Path -имяФайла $ключ) {
-            $успешноСертификатов++
+    if ($key -like "*.cer") {
+        $totalCertificates++
+        if (Import-Certificate -filePath $info.Path -fileName $key) {
+            $successCertificates++
         }
     }
-    elseif ($ключ -like "*.crl") {
-        $всегоСписков++
-        if (ИмпортCRL -путьФайла $инфо.Path -имяФайла $ключ) {
-            $успешноСписков++
+    elseif ($key -like "*.crl") {
+        $totalCRLs++
+        if (Import-CRL -filePath $info.Path -fileName $key) {
+            $successCRLs++
         }
     }
-    elseif ($ключ -like "*.p7b") {
-        $всегоКонтейнеров++
-        if (ИмпортP7B -путьФайла $инфо.Path -имяФайла $ключ) {
-            $успешноКонтейнеров++
+    elseif ($key -like "*.p7b") {
+        $totalContainers++
+        if (Import-P7B -filePath $info.Path -fileName $key) {
+            $successContainers++
         }
     }
 }
@@ -482,22 +482,22 @@ foreach ($ключ in $скачанныеФайлы.Keys) {
 # ======================================================
 # 10. РЕЗУЛЬТАТЫ
 # ======================================================
-$всегоИмпортировано = $успешноСертификатов + $успешноСписков + $успешноКонтейнеров
-$всегоОшибок = ($всегоСертификатов - $успешноСертификатов) + ($всегоСписков - $успешноСписков) + ($всегоКонтейнеров - $успешноКонтейнеров)
+$totalImported = $successCertificates + $successCRLs + $successContainers
+$totalErrors = ($totalCertificates - $successCertificates) + ($totalCRLs - $successCRLs) + ($totalContainers - $successContainers)
 
 Write-Host ("="*70)
 Write-Host "РЕЗУЛЬТАТЫ"
 Write-Host ("="*70)
-Write-Host "Скачано: $количествоСкачанных из $всегоСсылок"
+Write-Host "Скачано: $downloadedCount из $totalUrls"
 Write-Host ""
 Write-Host "Импорт:"
-Write-Host "  Сертификаты (.cer): $успешноСертификатов из $всегоСертификатов"
-Write-Host "  Списки отзыва (.crl): $успешноСписков из $всегоСписков"
-Write-Host "  Контейнеры (.p7b): $успешноКонтейнеров из $всегоКонтейнеров"
-Write-Host "  Всего импортировано: $всегоИмпортировано"
-Write-Host "  Ошибок: $всегоОшибок"
+Write-Host "  Сертификаты (.cer): $successCertificates из $totalCertificates"
+Write-Host "  Списки отзыва (.crl): $successCRLs из $totalCRLs"
+Write-Host "  Контейнеры (.p7b): $successContainers из $totalContainers"
+Write-Host "  Всего импортировано: $totalImported"
+Write-Host "  Ошибок: $totalErrors"
 Write-Host ""
-Write-Host "Лог: $файлЛога"
+Write-Host "Лог: $logFile"
 Write-Host ("="*70)
 
 # Сохраняем в лог
@@ -506,47 +506,47 @@ Write-Host ("="*70)
 ============================================================
 РЕЗУЛЬТАТЫ
 ============================================================
-Скачано: $количествоСкачанных из $всегоСсылок
+Скачано: $downloadedCount из $totalUrls
 
 Импорт:
-  Сертификаты (.cer): $успешноСертификатов из $всегоСертификатов
-  Списки отзыва (.crl): $успешноСписков из $всегоСписков
-  Контейнеры (.p7b): $успешноКонтейнеров из $всегоКонтейнеров
-  Всего импортировано: $всегоИмпортировано
-  Ошибок: $всегоОшибок
+  Сертификаты (.cer): $successCertificates из $totalCertificates
+  Списки отзыва (.crl): $successCRLs из $totalCRLs
+  Контейнеры (.p7b): $successContainers из $totalContainers
+  Всего импортировано: $totalImported
+  Ошибок: $totalErrors
 
-Лог: $файлЛога
+Лог: $logFile
 ============================================================
-"@ | Out-File $файлЛога -Append
+"@ | Out-File $logFile -Append
 
 # ======================================================
 # 11. СОХРАНЕНИЕ РЕЗУЛЬТАТА
 # ======================================================
-if ($ФайлРезультата) {
-    $результат = @{
-        Success = $всегоИмпортировано
-        Errors = $всегоОшибок
-        Total = $количествоСкачанных
-        LogFile = $файлЛога
+if ($ResultFile) {
+    $result = @{
+        Success = $totalImported
+        Errors = $totalErrors
+        Total = $downloadedCount
+        LogFile = $logFile
         Timestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-        AvCmUt4 = if ($avcmut) { "Найден" } else { "Не найден" }
-        MngCert = if ($mngcert) { "Найден" } else { "Не найден" }
-        IntegrityCheck = if ($целостностьОК) { "Пройдена" } else { "Нарушена" }
+        AvCmUt4 = if ($avCmUt4) { "Найден" } else { "Не найден" }
+        MngCert = if ($mngCert) { "Найден" } else { "Не найден" }
+        IntegrityCheck = if ($integrityOK) { "Пройдена" } else { "Нарушена" }
     } | ConvertTo-Json
-    $результат | Out-File $ФайлРезультата -Encoding utf8
+    $result | Out-File $ResultFile -Encoding utf8
 }
 
 # ======================================================
 # 12. ОЧИСТКА
 # ======================================================
-Remove-Item $временнаяПапка -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item $tempFolder -Recurse -Force -ErrorAction SilentlyContinue
 
 # Удаляем лог-файл AvCmUt4.log, если он создался
-$avcmutLog = Join-Path $env:TEMP "AvCmUt4.log"
-if (Test-Path $avcmutLog) {
-    Remove-Item $avcmutLog -Force -ErrorAction SilentlyContinue
+$avCmUt4Log = Join-Path $env:TEMP "AvCmUt4.log"
+if (Test-Path $avCmUt4Log) {
+    Remove-Item $avCmUt4Log -Force -ErrorAction SilentlyContinue
 }
 
 Write-Host "ГОТОВО!"
 
-if ($всегоОшибок -gt 0) { exit 1 } else { exit 0 }
+if ($totalErrors -gt 0) { exit 1 } else { exit 0 }
