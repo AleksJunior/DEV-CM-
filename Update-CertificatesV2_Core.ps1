@@ -389,53 +389,71 @@ Write-Host ("`n" + ("="*70))
 Write-Host "ИМПОРТ ФАЙЛОВ"
 Write-Host ("="*70)
 
-function Close-CertificateManager {
-    $processes = @("certmgr", "mmc")
-    $found = $false
+# ======================================================
+# ПРОВЕРКА ОТКРЫТЫХ ПРОГРАММ, БЛОКИРУЮЩИХ ХРАНИЛИЩЕ
+# ======================================================
+function Close-BlockingPrograms {
+    # Процессы, которые блокируют хранилище сертификатов
+    $blockingProcesses = @(
+        "certmgr",           # Менеджер сертификатов Windows
+        "mmc",               # Консоль MMC (может быть оснастка с сертификатами)
+        "AvPCM",             # Комплект Абонента Авест
+        "MngCert",           # Менеджер сертификатов Авест
+        "AvCmUt4",           # Утилита Авест (может держать блокировку)
+        "AvPKISetup2"        # Установщик Авест
+    )
     
-    foreach ($procName in $processes) {
-        $proc = Get-Process -Name $procName -ErrorAction SilentlyContinue
-        if ($proc) {
-            $found = $true
-            break
+    $foundProcesses = @()
+    
+    foreach ($procName in $blockingProcesses) {
+        $procs = Get-Process -Name $procName -ErrorAction SilentlyContinue
+        if ($procs) {
+            $foundProcesses += $procs
         }
     }
     
-    if ($found) {
+    if ($foundProcesses.Count -gt 0) {
         Write-Host "`n" + ("="*70) -ForegroundColor Yellow
-        Write-Host "  ВНИМАНИЕ: Обнаружен открытый менеджер сертификатов!" -ForegroundColor Yellow
+        Write-Host "  ВНИМАНИЕ: Обнаружены программы, блокирующие хранилище!" -ForegroundColor Yellow
         Write-Host ("="*70) -ForegroundColor Yellow
         Write-Host ""
-        Write-Host "Открытый certmgr.msc или MMC блокирует импорт сертификатов." -ForegroundColor Cyan
-        Write-Host "Скрипт будет ждать, пока вы закроете менеджер сертификатов." -ForegroundColor Cyan
+        Write-Host "Найдены процессы:" -ForegroundColor Cyan
+        foreach ($proc in $foundProcesses) {
+            Write-Host "  • $($proc.Name) (PID: $($proc.Id))" -ForegroundColor Gray
+        }
         Write-Host ""
-        Write-Host "Пожалуйста, закройте все окна:" -ForegroundColor Yellow
-        Write-Host "  • certmgr.msc (Управление сертификатами)" -ForegroundColor Gray
-        Write-Host "  • mmc с оснасткой 'Сертификаты'" -ForegroundColor Gray
-        Write-Host "  • Любые другие программы, работающие с сертификатами" -ForegroundColor Gray
+        Write-Host "Эти программы блокируют импорт сертификатов." -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host "Пожалуйста, закройте:" -ForegroundColor Cyan
+        Write-Host "  • Комплект Абонента Авест (AvPCM)" -ForegroundColor Gray
+        Write-Host "  • Менеджер сертификатов Авест (MngCert)" -ForegroundColor Gray
+        Write-Host "  • Управление сертификатами Windows (certmgr.msc)" -ForegroundColor Gray
+        Write-Host ""
+        Write-Host "Скрипт будет ждать закрытия... (Ctrl+C для отмены)" -ForegroundColor Gray
         Write-Host ""
         
         do {
-            Write-Host "  Ожидание закрытия менеджера сертификатов... (Ctrl+C для отмены)" -ForegroundColor Gray
+            Write-Host "  Ожидание..." -ForegroundColor Gray
             Start-Sleep -Seconds 5
             
-            $stillOpen = $false
-            foreach ($procName in $processes) {
-                $proc = Get-Process -Name $procName -ErrorAction SilentlyContinue
-                if ($proc) {
-                    $stillOpen = $true
-                    break
+            $stillOpen = @()
+            foreach ($procName in $blockingProcesses) {
+                $procs = Get-Process -Name $procName -ErrorAction SilentlyContinue
+                if ($procs) {
+                    $stillOpen += $procs
                 }
             }
-        } while ($stillOpen)
+        } while ($stillOpen.Count -gt 0)
         
-        Write-Host "  Менеджер сертификатов закрыт. Продолжение..." -ForegroundColor Green
+        Write-Host ""
+        Write-Host "  Все блокирующие программы закрыты. Продолжение..." -ForegroundColor Green
+        Write-Host ""
         Start-Sleep -Seconds 2
     }
 }
 
-# Вызов проверки
-Close-CertificateManager
+# Вызвать перед импортом
+Close-BlockingPrograms
 
 foreach ($ключ in $скачанныеФайлы.Keys) {
     $инфо = $скачанныеФайлы[$ключ]
