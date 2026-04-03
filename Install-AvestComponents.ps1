@@ -79,45 +79,45 @@ if (-not $ScriptPath) {
     }
 }
 
-$ConfigFolder = Join-Path $ScriptPath "config"
-$AvestFolder = Join-Path $ScriptPath "avest"
-$ArchivesFolder = Join-Path $AvestFolder "archives"
-$UnpackedFolder = Join-Path $AvestFolder "unpacked"
-$LogsFolder = Join-Path $ScriptPath "logs"
-$ConfigFile = Join-Path $ConfigFolder "avest_urls.ini"
+$configFolder = Join-Path $ScriptPath "config"
+$avestFolder = Join-Path $ScriptPath "avest"
+$archivesFolder = Join-Path $avestFolder "archives"
+$unpackedFolder = Join-Path $avestFolder "unpacked"
+$logsFolder = Join-Path $ScriptPath "logs"
+$configFile = Join-Path $configFolder "avest_urls.ini"
 
-foreach ($folder in @($ConfigFolder, $AvestFolder, $ArchivesFolder, $UnpackedFolder, $LogsFolder)) {
+foreach ($folder in @($configFolder, $avestFolder, $archivesFolder, $unpackedFolder, $logsFolder)) {
     if (!(Test-Path $folder)) { 
         New-Item -ItemType Directory -Path $folder -Force | Out-Null
         Write-Host "  Создана папка: $folder" -ForegroundColor Gray
     }
 }
 
-$LogFile = Join-Path $LogsFolder "avest_install_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss').log"
+$logFile = Join-Path $logsFolder "avest_install_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss').log"
 
 # ======================================================
 # 2. ЗАГРУЗКА ОБЩИХ ФУНКЦИЙ
 # ======================================================
-$CommonScript = Join-Path $ScriptPath "Common-Functions.ps1"
-if (Test-Path $CommonScript) {
-    . $CommonScript
+$commonScript = Join-Path $ScriptPath "Common-Functions.ps1"
+if (Test-Path $commonScript) {
+    . $commonScript
 } else {
-    Write-Host "ОШИБКА: Общий модуль не найден: $CommonScript" -ForegroundColor Red
+    Write-Host "ОШИБКА: Общий модуль не найден: $commonScript" -ForegroundColor Red
     exit 1
 }
 
-Write-Log -Message "========================================" -LogFile $LogFile
-Write-Log -Message "Установка компонентов Авест" -LogFile $LogFile
-Write-Log -Message "========================================" -LogFile $LogFile
-Write-Log -Message "Путь скрипта: $ScriptPath" -LogFile $LogFile
-Write-Log -Message "Файл лога: $LogFile" -LogFile $LogFile
+Write-Log -Message "========================================" -LogFile $logFile
+Write-Log -Message "Установка компонентов Авест" -LogFile $logFile
+Write-Log -Message "========================================" -LogFile $logFile
+Write-Log -Message "Путь скрипта: $ScriptPath" -LogFile $logFile
+Write-Log -Message "Файл лога: $logFile" -LogFile $logFile
 
 # ======================================================
 # 3. ЗАГРУЗКА КОНФИГУРАЦИИ
 # ======================================================
-$config = Load-Config -ConfigFile $ConfigFile
+$config = Import-Config -ConfigFile $configFile
 if ($config.Count -eq 0) {
-    Write-Log -Message "ОШИБКА: Не удалось загрузить конфигурацию" -LogFile $LogFile
+    Write-Log -Message "ОШИБКА: Не удалось загрузить конфигурацию" -LogFile $logFile
     Write-Host "ОШИБКА: Не удалось загрузить конфигурацию" -ForegroundColor Red
     exit 1
 }
@@ -126,11 +126,11 @@ if ($config.Count -eq 0) {
 # 4. ПРОВЕРКА СТАТУСА КОМПОНЕНТОВ
 # ======================================================
 $componentStatus = @{
-    "AvPass" = Check-AvPass
-    "AvBign" = Check-AvBign
-    "AvCSPBel" = Check-AvCSPBel
-    "AvCSPBign" = Check-AvCSPBign
-    "AvReg" = Check-AvReg
+    "AvPass" = Test-AvPass
+    "AvBign" = Test-AvBign
+    "AvCSPBel" = Test-AvCSPBel
+    "AvCSPBign" = Test-AvCSPBign
+    "AvReg" = Test-AvReg
 }
 
 $components = @("AvPass", "AvBign", "AvCSPBel", "AvCSPBign", "AvReg")
@@ -170,15 +170,14 @@ function Install-Component {
         [bool]$ForceReinstall = $false
     )
     
-    $archivePath = Join-Path $ArchivesFolder $Config.FileName
+    $archivePath = Join-Path $archivesFolder $Config.FileName
     $archiveExists = Test-Path $archivePath
-    $unpackedPath = $UnpackedFolder
-    $targetFile = Join-Path $unpackedPath $Config.InstallerName
+    $targetFile = Join-Path $unpackedFolder $Config.InstallerName
     $fileExists = Test-Path $targetFile
     
     # Для AvPass/AvBign — если не найден, ищем рекурсивно
     if (-not $fileExists -and ($Component -eq "AvPass" -or $Component -eq "AvBign")) {
-        $found = Get-ChildItem -Path $unpackedPath -Recurse -Filter "AvPKISetup2.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+        $found = Get-ChildItem -Path $unpackedFolder -Recurse -Filter "AvPKISetup2.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($found) {
             $targetFile = $found.FullName
             $fileExists = $true
@@ -189,7 +188,7 @@ function Install-Component {
     # Проверка: архив есть, но нет распакованных файлов
     if ($archiveExists -and -not $fileExists) {
         Write-Host "`n[$Component] Архив найден, выполняю распаковку..." -ForegroundColor Yellow
-        $extracted = Extract-Archive -ArchivePath $archivePath -DestinationPath $unpackedPath
+        $extracted = Expand-Archive -ArchivePath $archivePath -DestinationPath $unpackedFolder
         if (-not $extracted) {
             Write-Host "  Не удалось распаковать архив" -ForegroundColor Red
             return $false
@@ -199,7 +198,7 @@ function Install-Component {
         
         # Повторный поиск для AvPass/AvBign
         if (-not $fileExists -and ($Component -eq "AvPass" -or $Component -eq "AvBign")) {
-            $found = Get-ChildItem -Path $unpackedPath -Recurse -Filter "AvPKISetup2.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+            $found = Get-ChildItem -Path $unpackedFolder -Recurse -Filter "AvPKISetup2.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
             if ($found) {
                 $targetFile = $found.FullName
                 $fileExists = $true
@@ -213,16 +212,16 @@ function Install-Component {
         
         if (Test-InternetConnection) {
             Write-Host "  Скачивание архива..." -ForegroundColor Gray
-            $downloaded = Download-FileWithFallback -Config $Config -DestinationFolder $ArchivesFolder
+            $downloaded = Save-FileWithFallback -Config $Config -DestinationFolder $archivesFolder
             if (-not $downloaded) {
                 Write-Host "  Не удалось скачать архив" -ForegroundColor Red
                 Write-Host "  Пожалуйста, скачайте архив вручную и поместите в:" -ForegroundColor Yellow
-                Write-Host "    $ArchivesFolder\$($Config.FileName)" -ForegroundColor Gray
+                Write-Host "    $archivesFolder\$($Config.FileName)" -ForegroundColor Gray
                 return $false
             }
             
             Write-Host "  Распаковка архива..." -ForegroundColor Gray
-            $extracted = Extract-Archive -ArchivePath $archivePath -DestinationPath $unpackedPath
+            $extracted = Expand-Archive -ArchivePath $archivePath -DestinationPath $unpackedFolder
             if (-not $extracted) {
                 Write-Host "  Не удалось распаковать архив" -ForegroundColor Red
                 return $false
@@ -232,7 +231,7 @@ function Install-Component {
             
             # Повторный поиск для AvPass/AvBign
             if (-not $fileExists -and ($Component -eq "AvPass" -or $Component -eq "AvBign")) {
-                $found = Get-ChildItem -Path $unpackedPath -Recurse -Filter "AvPKISetup2.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+                $found = Get-ChildItem -Path $unpackedFolder -Recurse -Filter "AvPKISetup2.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
                 if ($found) {
                     $targetFile = $found.FullName
                     $fileExists = $true
@@ -241,18 +240,18 @@ function Install-Component {
         } else {
             Write-Host "  ОШИБКА: Нет доступа к интернету и архив отсутствует!" -ForegroundColor Red
             Write-Host "  Пожалуйста, скачайте архив вручную и поместите в:" -ForegroundColor Yellow
-            Write-Host "    $ArchivesFolder\$($Config.FileName)" -ForegroundColor Gray
+            Write-Host "    $archivesFolder\$($Config.FileName)" -ForegroundColor Gray
             return $false
         }
     }
     
     # Проверка повреждённых файлов
-    if ((Test-Path $unpackedPath) -and (-not $fileExists)) {
+    if ((Test-Path $unpackedFolder) -and (-not $fileExists)) {
         Write-Host "`n[$Component] Обнаружены повреждённые файлы! Выполняю повторную распаковку..." -ForegroundColor Yellow
         if ($archiveExists) {
-            Remove-Item -Path $unpackedPath -Recurse -Force -ErrorAction SilentlyContinue
-            New-Item -ItemType Directory -Path $unpackedPath -Force | Out-Null
-            $extracted = Extract-Archive -ArchivePath $archivePath -DestinationPath $unpackedPath
+            Remove-Item -Path $unpackedFolder -Recurse -Force -ErrorAction SilentlyContinue
+            New-Item -ItemType Directory -Path $unpackedFolder -Force | Out-Null
+            $extracted = Expand-Archive -ArchivePath $archivePath -DestinationPath $unpackedFolder
             if (-not $extracted) {
                 Write-Host "  Не удалось распаковать архив" -ForegroundColor Red
                 return $false
@@ -261,7 +260,7 @@ function Install-Component {
             $fileExists = Test-Path $targetFile
             
             if (-not $fileExists -and ($Component -eq "AvPass" -or $Component -eq "AvBign")) {
-                $found = Get-ChildItem -Path $unpackedPath -Recurse -Filter "AvPKISetup2.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+                $found = Get-ChildItem -Path $unpackedFolder -Recurse -Filter "AvPKISetup2.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
                 if ($found) {
                     $targetFile = $found.FullName
                     $fileExists = $true
@@ -285,7 +284,7 @@ function Install-Component {
         Write-Host "`n[$Component] ОШИБКА: Установщик не найден!" -ForegroundColor Red
         Write-Host "  Искали: $($Config.InstallerName)" -ForegroundColor Yellow
         Write-Host "  Содержимое папки распаковки:" -ForegroundColor Gray
-        Get-ChildItem -Path $unpackedPath -Recurse | ForEach-Object {
+        Get-ChildItem -Path $unpackedFolder -Recurse | ForEach-Object {
             Write-Host "    $($_.FullName)" -ForegroundColor Gray
         }
         Write-Host ""
