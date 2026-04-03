@@ -112,15 +112,15 @@ if (-not $ScriptPath) {
 }
 
 # Основные папки
-$AvestFolder = Join-Path $ScriptPath "avest"
-$ArchivesFolder = Join-Path $AvestFolder "archives"
-$UnpackedFolder = Join-Path $AvestFolder "unpacked"
+$avestFolder = Join-Path $ScriptPath "avest"
+$archivesFolder = Join-Path $avestFolder "archives"
+$unpackedFolder = Join-Path $avestFolder "unpacked"
 
 # Папка для логов
 if (-not $LogsFolder) { $LogsFolder = Join-Path $ScriptPath "logs" }
 
 # Создаём все необходимые папки
-foreach ($folder in @($AvestFolder, $ArchivesFolder, $UnpackedFolder, $LogsFolder)) {
+foreach ($folder in @($avestFolder, $archivesFolder, $unpackedFolder, $LogsFolder)) {
     if (!(Test-Path $folder)) { 
         New-Item -ItemType Directory -Path $folder -Force | Out-Null
         Write-Host "  Создана папка: $folder" -ForegroundColor Gray
@@ -128,11 +128,11 @@ foreach ($folder in @($AvestFolder, $ArchivesFolder, $UnpackedFolder, $LogsFolde
 }
 
 # Файл лога
-$LogFile = Join-Path $LogsFolder "avcmxwebp_install_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss').log"
-$script:LogPath = $LogFile
+$logFile = Join-Path $LogsFolder "avcmxwebp_install_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss').log"
+$script:LogPath = $logFile
 
 # Сетевая директория (опционально, может быть недоступна)
-$NetworkSource = "\\asup-7\BackBox\DEV\CertificateManager V2.0\avest\unpacked"
+$networkSource = "\\asup-7\BackBox\DEV\CertificateManager V2.0\avest\unpacked"
 
 # Ссылки для скачивания (с резервными вариантами)
 $avPassUrls = @(
@@ -156,7 +156,7 @@ function Write-Log {
     param([string]$Message)
     try {
         $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-        "$timestamp - $Message" | Out-File $LogFile -Append -ErrorAction SilentlyContinue
+        "$timestamp - $Message" | Out-File $logFile -Append -ErrorAction SilentlyContinue
         Write-Host $Message -ErrorAction SilentlyContinue
     } catch { }
 }
@@ -247,10 +247,9 @@ function Save-AvPass {
     Write-Log "Загрузка AvPass из интернета..."
     Write-Host "`n[1/3] Загрузка AvPass..." -ForegroundColor Yellow
     
-    $archivePath = Join-Path $ArchivesFolder "AvPKISetup(bel).zip"
+    $archivePath = Join-Path $archivesFolder "AvPKISetup(bel).zip"
     
-    # ИСПРАВЛЕНО: прямой вызов функции вместо Invoke-Expression
-    $result = Download-FileWithFallback -Urls $avPassUrls -DestinationPath $archivePath -ComponentName "AvPass"
+    $result = Save-FileWithFallback -Urls $avPassUrls -DestinationPath $archivePath -ComponentName "AvPass"
     
     if ($result) {
         Write-Host "  AvPass скачан успешно!" -ForegroundColor Green
@@ -266,10 +265,9 @@ function Save-AvBign {
     Write-Log "Загрузка AvBign из интернета..."
     Write-Host "`n[2/3] Загрузка AvBign (резервный вариант)..." -ForegroundColor Yellow
     
-    $archivePath = Join-Path $ArchivesFolder "AvPKISetup(bign).zip"
+    $archivePath = Join-Path $archivesFolder "AvPKISetup(bign).zip"
     
-    # ИСПРАВЛЕНО: прямой вызов функции вместо Invoke-Expression
-    $result = Download-FileWithFallback -Urls $avBignUrls -DestinationPath $archivePath -ComponentName "AvBign"
+    $result = Save-FileWithFallback -Urls $avBignUrls -DestinationPath $archivePath -ComponentName "AvBign"
     
     if ($result) {
         Write-Host "  AvBign скачан успешно!" -ForegroundColor Green
@@ -302,7 +300,7 @@ function Expand-Archive {
         }
         
         # Распаковываем архив
-        Expand-Archive -Path $ArchivePath -DestinationPath $DestinationPath -Force -ErrorAction Stop
+        Microsoft.PowerShell.Archive\Expand-Archive -Path $ArchivePath -DestinationPath $DestinationPath -Force -ErrorAction Stop
         Write-Host "  Распаковка $ComponentName завершена" -ForegroundColor Green
         Write-Log "$ComponentName распакован в: $DestinationPath"
         return $true
@@ -320,7 +318,7 @@ function Find-InUnpacked {
     
     Write-Log "Поиск установщика AvCMXWebP в папке: $UnpackedFolder"
     
-    # ИСПРАВЛЕНО: сначала выполняем рекурсивный поиск всех установщиков
+    # Сначала выполняем рекурсивный поиск всех установщиков
     $allInstallers = Get-ChildItem -Path $UnpackedFolder -Recurse -Filter "AvCMXWebP-*.exe" -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending
     
     if ($allInstallers.Count -gt 0) {
@@ -329,7 +327,7 @@ function Find-InUnpacked {
         return $allInstallers[0]
     }
     
-    # Если не нашли, пробуем поиск по шаблонам (на случай, если рекурсивный поиск почему-то не сработал)
+    # Если не нашли, пробуем поиск по шаблонам
     $searchPatterns = @(
         "AvPKISetup(bign)\data\AvCMXWebP-*.exe",
         "AvPKISetup(bel)\data\AvCMXWebP-*.exe"
@@ -440,7 +438,7 @@ function Test-PluginInstalled {
 }
 
 # Функция удаления предыдущей версии
-function Uninstall-PreviousVersion {
+function Remove-PreviousVersion {
     Write-Log "Поиск деинсталлятора..."
     
     $uninstallPaths = @(
@@ -480,7 +478,7 @@ function Uninstall-PreviousVersion {
 # Функция попытки загрузки и распаковки компонента
 function DownloadAndExtract {
     param(
-        [string]$ComponentType,  # "AvPass" или "AvBign"
+        [string]$ComponentType,
         [scriptblock]$DownloadFunc,
         [string]$ArchiveName,
         [string]$DisplayName
@@ -497,9 +495,8 @@ function DownloadAndExtract {
     }
     
     # Распаковываем компонент (без установки!)
-    $archivePath = Join-Path $ArchivesFolder $ArchiveName
-    # ИСПРАВЛЕНО: вызов функции с правильными параметрами
-    $extractSuccess = Extract-Archive -ArchivePath $archivePath -DestinationPath $UnpackedFolder -ComponentName $DisplayName
+    $archivePath = Join-Path $archivesFolder $ArchiveName
+    $extractSuccess = Expand-Archive -ArchivePath $archivePath -DestinationPath $unpackedFolder -ComponentName $DisplayName
     
     if (-not $extractSuccess) {
         Write-Host "  Не удалось распаковать $DisplayName" -ForegroundColor Red
@@ -519,8 +516,8 @@ Write-Log "========================================"
 Write-Log "Скрипт установки AvCMXWebP"
 Write-Log "========================================"
 Write-Log "Путь скрипта: $ScriptPath"
-Write-Log "Папка с распакованными компонентами: $UnpackedFolder"
-Write-Log "Файл лога: $LogFile"
+Write-Log "Папка с распакованными компонентами: $unpackedFolder"
+Write-Log "Файл лога: $logFile"
 
 Write-Host ("="*70) -ForegroundColor Cyan
 Write-Host "  УСТАНОВКА ПЛАГИНА AvCMXWebP" -ForegroundColor Yellow
@@ -530,7 +527,7 @@ Write-Host ""
 # ======================================================
 # 4. ПРОВЕРКА, УСТАНОВЛЕН ЛИ ПЛАГИН
 # ======================================================
-$alreadyInstalled = Check-PluginInstalled
+$alreadyInstalled = Test-PluginInstalled
 
 if ($alreadyInstalled) {
     Write-Host "Плагин AvCMXWebP уже установлен." -ForegroundColor Green
@@ -544,7 +541,7 @@ if ($alreadyInstalled) {
             exit 0
         }
         Write-Host "Выполняется переустановка..." -ForegroundColor Yellow
-        Uninstall-PreviousVersion
+        Remove-PreviousVersion
     } catch {
         Write-Host "Завершение работы..." -ForegroundColor Gray
         $script:NormalExit = $true
@@ -556,12 +553,12 @@ if ($alreadyInstalled) {
 # 5. ПОИСК УСТАНОВЩИКА ПЛАГИНА
 # ======================================================
 Write-Host "Шаг 1: Поиск установщика AvCMXWebP..." -ForegroundColor Cyan
-$installer = Find-InUnpacked -UnpackedFolder $UnpackedFolder
+$installer = Find-InUnpacked -UnpackedFolder $unpackedFolder
 
 # Шаг 2: Если не нашли, пробуем скопировать из сетевой папки
 if (-not $installer) {
     Write-Host "`nШаг 2: Поиск в сетевой папке..." -ForegroundColor Cyan
-    $installer = Copy-FromNetwork -NetworkPath $NetworkSource -TargetFolder $UnpackedFolder
+    $installer = Copy-FromNetwork -NetworkPath $networkSource -TargetFolder $unpackedFolder
 }
 
 # Шаг 3: Если всё ещё не нашли, проверяем интернет
@@ -580,32 +577,32 @@ if (-not $installer) {
         Write-Host "Возможные решения:" -ForegroundColor Cyan
         Write-Host "  1. Подключитесь к интернету и повторите попытку" -ForegroundColor Gray
         Write-Host "  2. Скопируйте установщик вручную в папку:" -ForegroundColor Gray
-        Write-Host "     $UnpackedFolder\AvPKISetup(bel)\data\" -ForegroundColor White
+        Write-Host "     $unpackedFolder\AvPKISetup(bel)\data\" -ForegroundColor White
         Write-Host "     или" -ForegroundColor Gray
-        Write-Host "     $UnpackedFolder\AvPKISetup(bign)\data\" -ForegroundColor White
+        Write-Host "     $unpackedFolder\AvPKISetup(bign)\data\" -ForegroundColor White
         Write-Host "  3. Обеспечьте доступность сетевой папки:" -ForegroundColor Gray
-        Write-Host "     $NetworkSource" -ForegroundColor White
+        Write-Host "     $networkSource" -ForegroundColor White
         Write-Host ""
         exit 1
     }
     
     # Шаг 3.1: Пробуем скачать и распаковать AvPass
     Write-Host "`n[Вариант А] Попытка загрузки AvPass..." -ForegroundColor Cyan
-    $avPassSuccess = DownloadAndExtract -ComponentType "AvPass" -DownloadFunc { Download-AvPass } -ArchiveName "AvPKISetup(bel).zip" -DisplayName "AvPass"
+    $avPassSuccess = DownloadAndExtract -ComponentType "AvPass" -DownloadFunc { Save-AvPass } -ArchiveName "AvPKISetup(bel).zip" -DisplayName "AvPass"
     
     if ($avPassSuccess) {
         Write-Host "`n  Повторный поиск установщика AvCMXWebP..." -ForegroundColor Yellow
-        $installer = Find-InUnpacked -UnpackedFolder $UnpackedFolder
+        $installer = Find-InUnpacked -UnpackedFolder $unpackedFolder
     }
     
     # Шаг 3.2: Если AvPass не помог, пробуем AvBign
     if (-not $installer) {
         Write-Host "`n[Вариант Б] AvPass не помог, пробуем AvBign..." -ForegroundColor Cyan
-        $avBignSuccess = DownloadAndExtract -ComponentType "AvBign" -DownloadFunc { Download-AvBign } -ArchiveName "AvPKISetup(bign).zip" -DisplayName "AvBign"
+        $avBignSuccess = DownloadAndExtract -ComponentType "AvBign" -DownloadFunc { Save-AvBign } -ArchiveName "AvPKISetup(bign).zip" -DisplayName "AvBign"
         
         if ($avBignSuccess) {
             Write-Host "`n  Повторный поиск установщика AvCMXWebP..." -ForegroundColor Yellow
-            $installer = Find-InUnpacked -UnpackedFolder $UnpackedFolder
+            $installer = Find-InUnpacked -UnpackedFolder $unpackedFolder
         }
     }
 }
@@ -617,8 +614,8 @@ if (-not $installer) {
     Write-Host ("="*70) -ForegroundColor Red
     Write-Host ""
     Write-Host "Поиск выполнялся в следующих местах:" -ForegroundColor Yellow
-    Write-Host "  • Локальная папка: $UnpackedFolder" -ForegroundColor Gray
-    Write-Host "  • Сетевая папка: $NetworkSource" -ForegroundColor Gray
+    Write-Host "  • Локальная папка: $unpackedFolder" -ForegroundColor Gray
+    Write-Host "  • Сетевая папка: $networkSource" -ForegroundColor Gray
     Write-Host "  • После загрузки AvPass" -ForegroundColor Gray
     Write-Host "  • После загрузки AvBign" -ForegroundColor Gray
     Write-Host ""
@@ -629,8 +626,8 @@ if (-not $installer) {
     Write-Host ""
     Write-Host "Ручное решение:" -ForegroundColor Cyan
     Write-Host "  Скопируйте установщик плагина вручную в одну из папок:" -ForegroundColor Gray
-    Write-Host "  • $UnpackedFolder\AvPKISetup(bel)\data\" -ForegroundColor White
-    Write-Host "  • $UnpackedFolder\AvPKISetup(bign)\data\" -ForegroundColor White
+    Write-Host "  • $unpackedFolder\AvPKISetup(bel)\data\" -ForegroundColor White
+    Write-Host "  • $unpackedFolder\AvPKISetup(bign)\data\" -ForegroundColor White
     Write-Host "  Затем запустите скрипт снова." -ForegroundColor Gray
     Write-Host ""
     
@@ -669,7 +666,7 @@ try {
     Write-Host ""
     Write-Host "Сообщение об ошибке: $($_.Exception.Message)" -ForegroundColor Red
     Write-Host ""
-    Write-Host "Проверьте лог для получения подробностей: $LogFile" -ForegroundColor Gray
+    Write-Host "Проверьте лог для получения подробностей: $logFile" -ForegroundColor Gray
     $script:NormalExit = $true
     exit 1
 }
