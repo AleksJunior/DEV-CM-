@@ -102,7 +102,7 @@ $taskName = "UpdateCertificatesV2"
 # Проверяем, существует ли файл скрипта обновления
 if (!(Test-Path $updateScript)) { 
     Write-Host "Скрипт не найден: $updateScript" -ForegroundColor Red
-    Write-Host "Убедитесь, что файл Update-CertificatesV2.ps1 находится в папке:" -ForegroundColor Yellow
+    Write-Host "Убедитесь, что файл Update-OnlyCertificates.ps1 находится в папке:" -ForegroundColor Yellow  # ИСПРАВЛЕНО: имя файла
     Write-Host "  $scriptPath" -ForegroundColor Gray
     pause
     exit 1
