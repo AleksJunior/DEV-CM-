@@ -8,7 +8,7 @@
 | Задача                      | Описание                                                                                   |
 |-----------------------------|--------------------------------------------------------------------------------------------|
 | Обновление сертификатов     | Скачивание и установка корневых и промежуточных сертификатов, СОС из доверенных источников |
-| Установка компонентов Авест | Автоматическая установка криптопровайдеров и комплектов абонента                           |
+| Установка компонентов Авест | Скачивание и установка криптопровайдеров и комплектов абонента                             |
 | Установка плагина AvCMXWebP | Установка плагина для работы с порталами в режиме IE Mode в Edge                           |
 | Автоматизация               | Настройка автозапуска обновления через планировщик заданий Windows                         |
 | Мониторинг                  | Проверка статуса установленных компонентов и логирование всех операций                     |
@@ -22,7 +22,7 @@ Is a suite of PowerShell scripts designed to automate certificate and cryptograp
 |Feature	                     |Description                                                                                                      |
 |------------------------------|-----------------------------------------------------------------------------------------------------------------|
 |Certificate Update	           | Download and install root/intermediate certificates and Certificate Revocation Lists (CRLs) from trusted sources|
-|Avest Component Setup	       | Automated installation of crypto providers and client software packages                                         |
+|Avest Component Setup	       | Download and install of crypto providers and client software packages                                           |
 |AvCMXWebP Plugin Installation | Install plugin for portal access using IE Mode in Microsoft Edge                                                |
 |Automation	                   | Configure automatic update triggers via Windows Task Scheduler                                                  |
 |Monitoring	                   | Verify component installation status and log all operations                                                     |
