@@ -249,9 +249,9 @@ Get-Content "C:\CertificateManager V2.0\logs\import_*.log" -Tail 50
 .\Create-ScheduledTaskV2.ps1
 
 # Проверка задачи
-schtasks /query /tn UpdateCertificatesV2
-schtasks /run /tn UpdateCertificatesV2
-schtasks /delete /tn UpdateCertificatesV2 /f
+schtasks /query /tn Update-OnlyCertificates
+schtasks /run /tn Update-OnlyCertificates
+schtasks /delete /tn Update-OnlyCertificates /f
 
 ---
 
