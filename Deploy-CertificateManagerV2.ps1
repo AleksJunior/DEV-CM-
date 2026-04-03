@@ -38,7 +38,7 @@ license that can be found in the LICENSE file.
         └── Common-Functions.ps1          # Общий модуль функций
     
     Параметры (встроенные):
-        $source = "D:\BackBox\DEV\CertificateManager V2.0"   # Источник (сетевая папка)
+        $source = "\\x\x\x"   # Источник (сетевая папка)
         $target = "C:\CertificateManager V2.0"               # Целевая папка
     
     Особенности:
@@ -80,7 +80,7 @@ if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 # 2. НАСТРОЙКА ПАРАМЕТРОВ
 # ======================================================
 # Источник (сетевая папка)
-$source = "\\ASUP-7\BackBox\DEV\DEV-CM-"
+$source = "\\x\x"
 
 # Целевая папка
 $target = "C:\CertificateManager V2.0"
