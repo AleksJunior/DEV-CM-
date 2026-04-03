@@ -85,7 +85,7 @@ $source = "D:\BackBox\DEV\CertificateManager V2.0"
 # Целевая папка
 $target = "C:\CertificateManager V2.0"
 
-# Список папок для создания
+# Список папок для создания (ИСПРАВЛЕНО: синтаксис массива)
 $foldersToCreate = @(
     "logs",
     "downloads",
