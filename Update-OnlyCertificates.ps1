@@ -3,7 +3,7 @@ Copyright (c) 2026 Alex Bird
 Use of this source code is governed by an MIT-style
 license that can be found in the LICENSE file.
 .SYNOPSIS
-    Обновление сертификатов и списков отзыва (CRL) без установки компонентов
+    Обновление сертификатов и списков отзыва (CRL) без установки компонентов.
 .DESCRIPTION
     Скрипт для обновления сертификатов и списков отзыва (CRL) из файла all_certs_urls.txt.
     
