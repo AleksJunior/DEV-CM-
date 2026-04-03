@@ -27,10 +27,5 @@ fix: переименование функций для соответствия
 ИЗМЕНЕНИЯ В Deploy-CertificateManagerV2.ps1:
 - Исправлен синтаксис объявления массива $foldersToCreate
 
-ДОБАВЛЕНА ПРОВЕРКА ПРАВ АДМИНИСТРАТОРА:
-- Install-AvestComponents.ps1
-- Install-AvCMXWebP.ps1
-- Create-ScheduledTaskV2.ps1
-
 Теперь все скрипты соответствуют правилам PSScriptAnalyzer для утверждённых глаголов
 и имеют правильную обработку блокировки хранилища сертификатов.
