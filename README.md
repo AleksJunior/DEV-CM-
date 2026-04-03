@@ -1,5 +1,5 @@
 # DEV-CM-
-Мои проекты, заметки и примеры кода по разработке "Менеджер сертификатов" V2.0 — это комплекс PowerShell-скриптов для автоматизации управления сертификатами и 
+"Менеджер сертификатов" V2.0 — это комплекс PowerShell-скриптов для автоматизации управления сертификатами и 
 криптографическими компонентами в инфраструктуре Республики Беларусь.
 
 # Основные задачи
@@ -15,12 +15,11 @@
 Certificate Manager V2.0 is a suite of PowerShell scripts designed to automate certificate and cryptographic component management within the infrastructure of the Republic of Belarus.
 
 #Core Features
-
-Feature	                       Description
-
-Certificate Update	           Download and install root/intermediate certificates and Certificate Revocation Lists (CRLs) from trusted sources
-Avest Component Setup	         Automated installation of crypto providers and client software packages
-AvCMXWebP Plugin Installation	 Install plugin for portal access using IE Mode in Microsoft Edge
-Automation	                   Configure automatic update triggers via Windows Task Scheduler
-Monitoring	                   Verify component installation status and log all operations
+|Feature	                     |Description                                                                                                      |
+|------------------------------|-----------------------------------------------------------------------------------------------------------------|
+|Certificate Update	           | Download and install root/intermediate certificates and Certificate Revocation Lists (CRLs) from trusted sources|
+|Avest Component Setup	       | Automated installation of crypto providers and client software packages                                         |
+|AvCMXWebP Plugin Installation | Install plugin for portal access using IE Mode in Microsoft Edge                                                |
+|Automation	                   | Configure automatic update triggers via Windows Task Scheduler                                                  |
+|Monitoring	                   | Verify component installation status and log all operations                                                     |
 
