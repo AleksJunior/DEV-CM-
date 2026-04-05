@@ -1,8 +1,17 @@
+## 📝 Обновлённая документация и файлы фиксов
+
+---
+
+### 1. **DOCUMENTATION.txt** (обновлённая версия)
+
+```text
 # 📘 Менеджер сертификатов V2.0 — Техническая документация
 
 ## 1. Общее описание
 
-Менеджер сертификатов V2.0 — комплекс PowerShell-скриптов для автоматизации управления сертификатами и криптографическими компонентами.
+Менеджер сертификатов V2.0 — комплекс PowerShell-скриптов для автоматизации 
+управления сертификатами и криптографическими компонентами в инфраструктуре 
+Республики Беларусь.
 
 **Основные задачи:**
 - Обновление сертификатов и списков отзыва (CRL)
@@ -10,6 +19,7 @@
 - Установка плагина AvCMXWebP для работы порталов в IE Mode
 - Настройка автозапуска через планировщик Windows
 - Мониторинг и логирование всех операций
+- Управление политикой выполнения PowerShell скриптов
 
 ---
 
@@ -31,15 +41,10 @@ Certif.  Compon.             TaskV2
                         ▼
                 Common-Functions.ps1
 
-**Взаимосвязи:**
-- `CertificateManagerV2.ps1` — GUI, точка входа
-- `Update-OnlyCertificates.ps1` — обновление сертификатов (для GUI и планировщика)
-- `Update-CertificatesV2_Core.ps1` — ядро обновления
-- `Install-AvestComponents.ps1` — установка компонентов Авест
-- `Install-AvCMXWebP.ps1` — установка плагина
-- `Create-ScheduledTaskV2.ps1` — настройка автозапуска
-- `Deploy-CertificateManagerV2.ps1` — развёртывание
-- `Common-Functions.ps1` — общий модуль
+**Вспомогательные скрипты:**
+- enable_scripts.ps1 — разрешение выполнения скриптов (RemoteSigned)
+- disable_scripts.ps1 — запрет выполнения скриптов (Restricted)
+- Deploy-CertificateManagerV2.ps1 — развёртывание из сетевой папки
 
 ---
 
@@ -47,72 +52,147 @@ Certif.  Compon.             TaskV2
 
 ### 3.1. CertificateManagerV2.ps1 — GUI
 
-Графический интерфейс на Windows Forms. При запуске сворачивает консоль. Кнопки разделены на две колонки: основные операции (синие) и вспомогательные (светлые). Блокировка повторных нажатий, цветовая индикация статуса.
+Графический интерфейс на Windows Forms. При запуске сворачивает консоль. 
+Кнопки разделены на две колонки: основные операции (синие) и вспомогательные (светлые). 
+Блокировка повторных нажатий, цветовая индикация статуса.
 
-**Переменные блокировки:** `$schedulerRunning`, `$updateRunning`, `$installRunning`, `$folderWindowOpen`, `$urlFileOpen`, `$avestInstallRunning`
+**Переменные блокировки:** `$schedulerRunning`, `$updateRunning`, `$installRunning`, 
+`$folderWindowOpen`, `$urlFileOpen`, `$avestInstallRunning`
 
-### 3.2. Common-Functions.ps1 — Общий модуль
+### 3.2. Common-Functions.ps1 — Общий модуль (v2.1)
 
-**Логирование:** `Write-Log`, `Write-ExitLog`, глобальные переменные `$script:NormalExit`, `$script:LogPath`, обработчик `PowerShell.Exiting`, перехват `trap`
+**Логирование:** 
+- `Write-Log`, `Write-ExitLog`
+- Глобальные переменные `$script:NormalExit`, `$script:LogPath`
+- Обработчик `PowerShell.Exiting`, перехват `trap`
 
-**Сетевые функции:** `Test-InternetConnection` (DNS + TCP + ping), `Save-FileWithFallback` (скачивание с резервными URL)
+**Сетевые функции:** 
+- `Test-InternetConnection` (DNS + TCP + ping)
+- `Save-FileWithFallback` (скачивание с резервными URL, ВСЕГДА перезапись)
 
-**Архивы:** `Get-WinRARPath` (поиск WinRAR), `Expand-Archive` (ZIP, RAR через WinRAR)
+**Архивы:** 
+- `Get-WinRARPath` (поиск WinRAR)
+- `Expand-Archive` (ZIP через встроенный командлет, RAR через WinRAR)
 
-**Конфигурация:** `Import-Config` (INI → хеш-таблица)
+**Конфигурация:** 
+- `Import-Config` (INI → хеш-таблица)
 
-**Подтверждение:** `Confirm-Action` (д/н)
+**Подтверждение:** 
+- `Confirm-Action` (д/н)
 
-**Проверка компонентов Авест:** `Test-AvPass`, `Test-AvBign`, `Test-AvCSPBel`, `Test-AvCSPBign`, `Test-AvReg` (файловая система + реестр)
+**Проверка компонентов Авест:** 
+- `Test-AvPass`, `Test-AvBign`, `Test-AvCSPBel`, `Test-AvCSPBign`, `Test-AvReg`
 
 ### 3.3. Update-OnlyCertificates.ps1
 
-Скачивание и установка сертификатов/CRL без компонентов Авест. Параметр `-ResultFile`. Коды возврата: 0 — успех, 1 — ошибка.
+Скачивание и установка сертификатов/CRL без компонентов Авест. 
+Параметр `-ResultFile`. Коды возврата: 0 — успех, 1 — ошибка.
 
 ### 3.4. Update-CertificatesV2_Core.ps1 — Ядро
 
 - Создание папок `logs`, `downloads`, временной папки
-- Поиск `AvCmUt4.exe` и `MngCert.exe` в `AvPCM_nces`, `AvPCM_ncesBign`, `AvPCM`
+- Поиск `AvCmUt4.exe` и `MngCert.exe` в `Program Files\Avest\`
 - Чтение `all_certs_urls.txt` (пропуск пустых строк и `#`)
 - Скачивание файлов во временную папку
-- Импорт: `.cer` → Root/CA (приоритет: MngCert.exe → certutil → .NET fallback), `.crl` → AvCmUt4.exe → certutil, `.p7b` → certutil
+- Импорт: `.cer` → Root/CA (приоритет: MngCert.exe → certutil → .NET fallback), 
+  `.crl` → AvCmUt4.exe → certutil, `.p7b` → certutil
 - Сохранение копий в `downloads`
 - Вывод результата в JSON при указании `-ResultFile`
 - Очистка временных файлов, удаление `AvCmUt4.log`
 
-### 3.5. Install-AvestComponents.ps1
+### 3.5. Install-AvestComponents.ps1 (v2.1)
 
-Интерактивная установка компонентов. Параметр `-ScriptPath`. Алгоритм:
+Интерактивная установка компонентов. Параметр `-ScriptPath`.
+
+**Алгоритм:**
 1. Проверка статуса компонентов
 2. Вывод цветной таблицы
 3. Предупреждение об антивирусе
 4. Меню выбора (1-5, 0 — выход)
-5. Для выбранного компонента: проверка архива → скачивание (если нет и есть интернет) → распаковка → поиск установщика (рекурсивно для AvPass/AvBign) → запуск
+5. Для выбранного компонента:
+   - Очистка `unpacked`
+   - Скачивание архива (всегда, удаляя старый)
+   - Распаковка через `Microsoft.PowerShell.Archive\Expand-Archive`
+   - Поиск установщика по фиксированным путям:
+     - AvPass: `AvPKISetup(bel)\AvPKISetup2.exe`
+     - AvBign: `AvPKISetup(bign)\AvPKISetup2.exe`
+     - AvCSPBel: `AvPKISetup(bel)\data\setupAvCSPBel*.exe` → `setupAvCSPBel*.exe`
+     - AvCSPBign: `AvPKISetup(bign)\data\setupAvCSPBign*.exe` → `setupAvCSPBign*.exe`
+     - AvReg: `requireSAI_DLL.reg`
+   - Запуск установщика (regedit /s для реестра)
 6. Повтор до выбора 0
 
-### 3.6. Install-AvCMXWebP.ps1
+### 3.6. Install-AvCMXWebP.ps1 (v2.1)
 
 Автоматическая установка плагина. Параметры: `-ScriptPath`, `-LogsFolder`.
 
-Алгоритм поиска:
-1. Поиск в `avest\unpacked\AvPKISetup(*)\data\AvCMXWebP-*.exe` (рекурсивно) — функция `Search-InUnpacked`
-2. Поиск в сетевой папке (если настроена) — функция `Copy-FromNetwork`
-3. Проверка интернета → загрузка и распаковка AvPass (только распаковка!) → повторный поиск
-4. Если не помогло — загрузка и распаковка AvBign
-5. Установка найденного установщика
+**Алгоритм:**
+1. Очистка `unpacked`
+2. Скачивание `AvPKISetup(bel).zip` (всегда, удаляя старый)
+3. Распаковка архива
+4. Поиск плагина в:
+   - `AvPKISetup(bel)\data\AvCMXWebP-*.exe`
+   - `AvPKISetup(bign)\data\AvCMXWebP-*.exe`
+5. Выбор самого свежего (по дате)
+6. Запуск установки
+
+**Поддерживаемые URL (с резервными):**
+- `https://nces.by/wp-content/uploads/gossuok/AvPKISetup(bel).zip`
+- `https://goszakupki.by/upload/AvPKISetup(bel).zip`
+- `https://portal.nalog.gov.by/ca/AvPKISetup(bel).zip`
 
 ### 3.7. Create-ScheduledTaskV2.ps1
 
-Создание задачи в планировщике: имя `UpdateCertificatesV2`, триггер — при старте системы, задержка 2 минуты, пользователь SYSTEM, права HIGHEST. Создаётся временный скрипт-обёртка с проверкой интернета (до 10 попыток, 5 минут), который запускает `Update-OnlyCertificates.ps1`.
+Создание задачи в планировщике:
+- Имя: `Update-OnlyCertificates`
+- Триггер: при старте системы
+- Задержка: 2 минуты
+- Пользователь: SYSTEM
+- Права: HIGHEST
 
-### 3.8. Deploy-CertificateManagerV2.ps1
+Создаётся временный скрипт-обёртка с проверкой интернета (до 10 попыток, 5 минут), 
+который запускает `Update-OnlyCertificates.ps1`.
 
-Развёртывание из сетевой папки. Создаёт структуру папок, копирует файлы, создаёт ярлык на рабочем столе, настраивает автозапуск, через 5 секунд запускает GUI.
+### 3.8. enable_scripts.ps1 — Разрешение выполнения скриптов
+
+Устанавливает политику выполнения `RemoteSigned`, которая позволяет запускать 
+локальные скрипты без подписи, а удалённые — только с цифровой подписью.
+
+**Алгоритм:**
+1. Запрос прав администратора
+2. Разблокировка всех `.ps1` файлов в текущей папке (`Unblock-File`)
+3. Проверка текущей политики:
+   - Если `RemoteSigned` — сообщает, что уже настроено
+   - Если `Bypass` — сообщает, что всё разрешено (опционально установка)
+   - Иначе — установка `RemoteSigned` через реестр или `Set-ExecutionPolicy`
+4. Вывод результата
+
+**Ручная команда:** `Set-ExecutionPolicy RemoteSigned -Force`
+
+### 3.9. disable_scripts.ps1 — Запрет выполнения скриптов
+
+Устанавливает политику выполнения `Restricted`, которая полностью запрещает 
+запуск любых PowerShell скриптов.
+
+**Алгоритм:**
+1. Запрос прав администратора
+2. Предупреждение и подтверждение
+3. Проверка текущей политики
+4. Установка `Restricted` через `Set-ExecutionPolicy`
+5. Вывод результата
+
+**Ручная команда:** `Set-ExecutionPolicy Restricted -Force`
+
+### 3.10. Deploy-CertificateManagerV2.ps1
+
+Развёртывание из сетевой папки. Создаёт структуру папок, копирует файлы, 
+создаёт ярлык на рабочем столе, настраивает автозапуск, через 5 секунд запускает GUI.
 
 ---
 
 ## 4. Структура папок
 
+```
 C:\CertificateManager V2.0\
 ├── logs\                    # Логи
 ├── downloads\               # Кэш сертификатов
@@ -127,9 +207,12 @@ C:\CertificateManager V2.0\
 ├── Install-AvestComponents.ps1
 ├── Install-AvCMXWebP.ps1
 ├── Create-ScheduledTaskV2.ps1
+├── enable_scripts.ps1
+├── disable_scripts.ps1
 ├── all_certs_urls.txt
 ├── Common-Functions.ps1
 └── Deploy-CertificateManagerV2.ps1
+```
 
 ---
 
@@ -137,7 +220,8 @@ C:\CertificateManager V2.0\
 
 ### 5.1. all_certs_urls.txt
 
-Список URL для скачивания. Строки, начинающиеся с `#`, игнорируются. Поддерживаются `.cer`, `.crl`, `.p7b`.
+Список URL для скачивания. Строки, начинающиеся с `#`, игнорируются. 
+Поддерживаются `.cer`, `.crl`, `.p7b`.
 
 **Содержит ссылки на:**
 - НЦЭУ / ГосСУОК — сертификаты и CRL
@@ -147,15 +231,44 @@ C:\CertificateManager V2.0\
 
 ### 5.2. avest_urls.ini
 
-INI-файл с секциями: `[AvPass]`, `[AvBign]`, `[AvCSPBel]`, `[AvCSPBign]`, `[AvReg]`. Поля: `Name`, `URL`, `FallbackURL1`, `FallbackURL2`, `FileName`, `InstallerName`, `SilentArgs`.
+INI-файл с секциями: `[AvPass]`, `[AvBign]`, `[AvCSPBel]`, `[AvCSPBign]`, `[AvReg]`.
+
+**Поля:**
+- `Name` — отображаемое имя
+- `URL` — основная ссылка для скачивания
+- `FallbackURL1`, `FallbackURL2` — резервные ссылки
+- `FileName` — имя файла архива
+- `InstallerName` — путь к установщику внутри архива
+- `SilentArgs` — аргументы тихой установки
 
 ---
 
-## 6. Обработка ошибок и логирование
+## 6. Политики выполнения PowerShell
 
-**Типы логов:** `import_*.log` (сертификаты), `avest_install_*.log` (компоненты), `avcmxwebp_install_*.log` (плагин), `autostart_*.log` (автозапуск)
+| Политика | Описание |
+|----------|----------|
+| **Restricted** | ❌ Полное отключение — сценарии НЕ выполняются |
+| **RemoteSigned** | ✅ Локальные сценарии выполняются, удалённые — только подписанные |
+| **Bypass** | ✅ Всё выполняется, ничего не блокируется |
+| **AllSigned** | ⚠️ Только подписанные сценарии |
+| **Undefined** | ⚠️ Нет политики (используется локальная) |
 
-**Глобальный обработчик:** `Register-EngineEvent` для закрытия окна, `trap` для перехвата ошибок
+**Важно:** Задача в планировщике и GUI используют `-ExecutionPolicy Bypass`, 
+поэтому они работают даже при политике `Restricted`.
+
+---
+
+## 7. Обработка ошибок и логирование
+
+**Типы логов:** 
+- `import_*.log` (сертификаты)
+- `avest_install_*.log` (компоненты)
+- `avcmxwebp_install_*.log` (плагин)
+- `autostart_*.log` (автозапуск)
+
+**Глобальный обработчик:** 
+- `Register-EngineEvent` для закрытия окна
+- `trap` для перехвата ошибок
 
 **Коды возврата:** 0 — успех, 1 — ошибка
 
@@ -168,7 +281,7 @@ INI-файл с секциями: `[AvPass]`, `[AvBign]`, `[AvCSPBel]`, `[AvCSPB
 
 ---
 
-## 7. Требования к системе
+## 8. Требования к системе
 
 - Windows 10 / Server 2016+
 - PowerShell 5.0+
@@ -179,7 +292,7 @@ INI-файл с секциями: `[AvPass]`, `[AvBign]`, `[AvCSPBel]`, `[AvCSPB
 
 ---
 
-## 8. Руководство по эксплуатации
+## 9. Руководство по эксплуатации
 
 **Запуск:** ярлык на рабочем столе или `.\CertificateManagerV2.ps1`
 
@@ -197,11 +310,15 @@ INI-файл с секциями: `[AvPass]`, `[AvBign]`, `[AvCSPBel]`, `[AvCSPB
 
 **Открытие папки:** "Открыть папку"
 
+**Управление политикой выполнения:**
+- Разрешить скрипты: `.\enable_scripts.ps1`
+- Запретить скрипты: `.\disable_scripts.ps1`
+
 ---
 
-## 9. Устранение неполадок
+## 10. Устранение неполадок
 
-- **Ошибка "Не удается загрузить файл"** → `Set-ExecutionPolicy Bypass`
+- **Ошибка "Не удается загрузить файл"** → Запустите `enable_scripts.ps1`
 - **Окно закрывается сразу** → Запуск от администратора
 - **Крякозябры вместо русского** → Сохранить скрипты в UTF-8 с BOM
 - **Ошибка скачивания** → Проверить интернет и доступность сайтов
@@ -211,12 +328,15 @@ INI-файл с секциями: `[AvPass]`, `[AvBign]`, `[AvCSPBel]`, `[AvCSPB
 - **Скрипт не запускается при старте** → Проверить лог `autostart_*.log`
 
 **Диагностика:**
+```powershell
 Get-Content "C:\CertificateManager V2.0\logs\import_*.log" | Select-String "ОШИБКА"
 Get-Content "C:\CertificateManager V2.0\logs\import_*.log" -Tail 50
+Get-ExecutionPolicy
+```
 
 ---
 
-## 10. Расширение и модификация
+## 11. Расширение и модификация
 
 **Добавление источников сертификатов:** редактировать `all_certs_urls.txt`
 
@@ -224,6 +344,7 @@ Get-Content "C:\CertificateManager V2.0\logs\import_*.log" -Tail 50
 1. Добавить секцию в `avest_urls.ini`
 2. Добавить функцию `Test-NewComponent` в `Common-Functions.ps1`
 3. Добавить компонент в массив `$components` в `Install-AvestComponents.ps1`
+4. Добавить путь поиска в `Find-Installer`
 
 **Изменение путей:** отредактировать переменные `$source`, `$target`, `$NetworkSource`
 
@@ -231,8 +352,9 @@ Get-Content "C:\CertificateManager V2.0\logs\import_*.log" -Tail 50
 
 ---
 
-## Приложение: Примеры использования
+## Приложение A: Примеры использования
 
+```powershell
 # Полное обновление
 .\Update-CertificatesV2.ps1 -ResultFile "C:\temp\result.json"
 
@@ -248,11 +370,17 @@ Get-Content "C:\CertificateManager V2.0\logs\import_*.log" -Tail 50
 # Настройка автозапуска
 .\Create-ScheduledTaskV2.ps1
 
+# Разрешить выполнение скриптов
+.\enable_scripts.ps1
+
+# Запретить выполнение скриптов
+.\disable_scripts.ps1
+
 # Проверка задачи
 schtasks /query /tn Update-OnlyCertificates
 schtasks /run /tn Update-OnlyCertificates
 schtasks /delete /tn Update-OnlyCertificates /f
 
----
-
-*Версия: 2.0 | Дата: 03.04.2026*
+# Проверка политики выполнения
+Get-ExecutionPolicy
+```
