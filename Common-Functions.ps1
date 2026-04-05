@@ -14,28 +14,28 @@ license that can be found in the LICENSE file.
     
     Сетевые функции:
         - Test-InternetConnection: проверка доступа к интернету через DNS, TCP и ping
-        - Download-FileWithFallback: скачивание файла с поддержкой резервных URL
+        - Save-FileWithFallback: скачивание файла с поддержкой резервных URL (всегда перезапись)
     
     Работа с архивами:
         - Get-WinRARPath: поиск установленного WinRAR в системе
-        - Extract-Archive: распаковка ZIP и RAR архивов (RAR требует WinRAR)
+        - Expand-Archive: распаковка ZIP и RAR архивов (RAR требует WinRAR)
     
     Конфигурация:
-        - Load-Config: загрузка INI-файлов конфигурации в хеш-таблицу
+        - Import-Config: загрузка INI-файлов конфигурации в хеш-таблицу
     
     Взаимодействие с пользователем:
         - Confirm-Action: запрос подтверждения действия с ответом "д/н"
     
     Проверка компонентов Авест:
-        - Check-AvPass: проверка установки Комплекта Абонента АВЕСТ (AvPass)
-        - Check-AvBign: проверка установки Комплекта Абонента АВЕСТ (AvBign)
-        - Check-AvCSPBel: проверка криптопровайдера AvCSPBel
-        - Check-AvCSPBign: проверка криптопровайдера AvCSPBign
-        - Check-AvReg: проверка реестровых настроек SAI DLL
+        - Test-AvPass: проверка установки Комплекта Абонента АВЕСТ (AvPass)
+        - Test-AvBign: проверка установки Комплекта Абонента АВЕСТ (AvBign)
+        - Test-AvCSPBel: проверка криптопровайдера AvCSPBel (только реестр)
+        - Test-AvCSPBign: проверка криптопровайдера AvCSPBign (только реестр)
+        - Test-AvReg: проверка реестровых настроек SAI DLL
     
     Все функции имеют встроенное логирование и обработку ошибок.
 .NOTES
-    Версия: 2.0
+    Версия: 2.1 (исправленная)
     Используется во всех скриптах проекта через точку (.)
     Глобальные переменные:
         - $script:NormalExit: флаг нормального завершения скрипта
@@ -46,8 +46,8 @@ license that can be found in the LICENSE file.
         - Trap перехватывает все ошибки и записывает их в лог
     
     Проверка компонентов выполняется по:
-        - Файловой системе (проверка наличия исполняемых файлов и DLL)
-        - Реестру (поиск в Uninstall ключах)
+        - Файловой системе (AvPass, AvBign)
+        - Реестру (AvCSPBel, AvCSPBign, AvReg)
 #>
 
 # ======================================================
@@ -144,7 +144,7 @@ function Test-InternetConnection {
     return $false
 }
 
-# Скачивание файла с поддержкой резервных URL
+# Скачивание файла с поддержкой резервных URL (всегда перезаписывает)
 function Save-FileWithFallback {
     param(
         [hashtable]$Config,
@@ -159,10 +159,9 @@ function Save-FileWithFallback {
     
     $destinationPath = Join-Path $DestinationFolder $Config.FileName
     
+    # ВСЕГДА скачиваем заново (удаляем старый файл, если есть)
     if (Test-Path $destinationPath) {
-        Write-Host "  Файл уже существует: $($Config.FileName)" -ForegroundColor Green
-        Write-Log -Message "Файл уже существует: $destinationPath" -LogFile $script:LogPath
-        return $true
+        Remove-Item $destinationPath -Force -ErrorAction SilentlyContinue
     }
     
     $urls = @($Config.URL)
@@ -179,14 +178,22 @@ function Save-FileWithFallback {
             $webClient.DownloadFile($url, $destinationPath)
             $webClient.Dispose()
             
-            $size = (Get-Item $destinationPath).Length
-            Write-Host "    Успешно! ($([math]::Round($size/1KB, 0)) КБ)" -ForegroundColor Green
-            Write-Log -Message "Скачан $($Config.Name) из $url, размер: $size байт" -LogFile $script:LogPath
-            return $true
+            # Проверяем, что файл скачался и не пустой
+            if ((Test-Path $destinationPath) -and ((Get-Item $destinationPath).Length -gt 0)) {
+                $size = (Get-Item $destinationPath).Length
+                Write-Host "    Успешно! ($([math]::Round($size/1KB, 0)) КБ)" -ForegroundColor Green
+                Write-Log -Message "Скачан $($Config.Name) из $url, размер: $size байт" -LogFile $script:LogPath
+                return $true
+            } else {
+                throw "Файл пустой или не создан"
+            }
             
         } catch {
             Write-Host "    Ошибка: $($_.Exception.Message)" -ForegroundColor Red
             Write-Log -Message "Ошибка скачивания $($Config.Name) из $url : $($_.Exception.Message)" -LogFile $script:LogPath
+            if (Test-Path $destinationPath) {
+                Remove-Item $destinationPath -Force -ErrorAction SilentlyContinue
+            }
             continue
         }
     }
@@ -221,27 +228,33 @@ function Expand-Archive {
         [string]$DestinationPath
     )
     
+    # Проверяем существование архива
     if (!(Test-Path $ArchivePath)) {
         Write-Log -Message "Архив не найден: $ArchivePath" -LogFile $script:LogPath
+        Write-Host "  Архив не найден: $ArchivePath" -ForegroundColor Red
         return $false
     }
     
     $extension = [System.IO.Path]::GetExtension($ArchivePath).ToLower()
     
+    # ZIP архивы
     if ($extension -eq ".zip") {
         try {
             if (!(Test-Path $DestinationPath)) {
                 New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
             }
-            Expand-Archive -Path $ArchivePath -DestinationPath $DestinationPath -Force -ErrorAction Stop
+            # ВАЖНО: вызываем ВСТРОЕННЫЙ командлет, а не самих себя!
+            Microsoft.PowerShell.Archive\Expand-Archive -Path $ArchivePath -DestinationPath $DestinationPath -Force -ErrorAction Stop
             Write-Log -Message "Архив ZIP распакован в: $DestinationPath" -LogFile $script:LogPath
             return $true
         } catch {
             Write-Log -Message "Ошибка распаковки ZIP: $($_.Exception.Message)" -LogFile $script:LogPath
+            Write-Host "  Ошибка распаковки ZIP: $($_.Exception.Message)" -ForegroundColor Red
             return $false
         }
     }
     
+    # RAR архивы
     if ($extension -eq ".rar") {
         $winrar = Get-WinRARPath
         if ($winrar) {
@@ -256,10 +269,12 @@ function Expand-Archive {
                     return $true
                 } else {
                     Write-Log -Message "WinRAR вернул код ошибки: $($process.ExitCode)" -LogFile $script:LogPath
+                    Write-Host "  WinRAR ошибка: код $($process.ExitCode)" -ForegroundColor Red
                     return $false
                 }
             } catch {
                 Write-Log -Message "Ошибка распаковки RAR: $($_.Exception.Message)" -LogFile $script:LogPath
+                Write-Host "  Ошибка распаковки RAR: $($_.Exception.Message)" -ForegroundColor Red
                 return $false
             }
         } else {
@@ -270,6 +285,7 @@ function Expand-Archive {
     }
     
     Write-Log -Message "Неподдерживаемый формат архива: $extension" -LogFile $script:LogPath
+    Write-Host "  Неподдерживаемый формат архива: $extension" -ForegroundColor Red
     return $false
 }
 
@@ -340,7 +356,8 @@ function Confirm-Action {
 # ======================================================
 # 7. ПРОВЕРКА КОМПОНЕНТОВ АВЕСТ
 # ======================================================
-# Проверка установки AvPass
+
+# Проверка установки AvPass (файлы + реестр)
 function Test-AvPass {
     Write-Log -Message "Проверка AvPass..." -LogFile $script:LogPath
     
@@ -368,7 +385,7 @@ function Test-AvPass {
         }
     }
     
-    # 2. Проверка через реестр по DisplayName
+    # 2. Проверка через реестр
     $regPaths = @(
         "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
         "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
@@ -395,8 +412,8 @@ function Test-AvPass {
     return $false
 }
 
-# Проверка установки AvBign
-function Save-AvBign {
+# Проверка установки AvBign (файлы + реестр)
+function Test-AvBign {
     Write-Log -Message "Проверка AvBign..." -LogFile $script:LogPath
     
     # 1. Проверка файловой системы
@@ -419,7 +436,7 @@ function Save-AvBign {
         }
     }
     
-    # 2. Проверка через реестр по DisplayName
+    # 2. Проверка через реестр
     $regPaths = @(
         "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
         "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
@@ -446,25 +463,10 @@ function Save-AvBign {
     return $false
 }
 
-# Проверка установки AvCSPBel
+# Проверка установки AvCSPBel (только реестр)
 function Test-AvCSPBel {
     Write-Log -Message "Проверка AvCSPBel..." -LogFile $script:LogPath
     
-    # 1. Проверка файловой системы
-    $paths = @(
-        "C:\Program Files\Avest\Avest CSP Bel\AvCSPr.dll",
-        "C:\Program Files (x86)\Avest\Avest CSP Bel\AvCSPr.dll",
-        "C:\Program Files\Avest\Avest CSP Bel\AvCSPBel.dll",
-        "C:\Program Files (x86)\Avest\Avest CSP Bel\AvCSPBel.dll"
-    )
-    foreach ($path in $paths) {
-        if (Test-Path $path) { 
-            Write-Log -Message "  AvCSPBel найден по пути: $path" -LogFile $script:LogPath
-            return $true 
-        }
-    }
-    
-    # 2. Проверка через реестр по DisplayName
     $regPaths = @(
         "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
         "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
@@ -491,25 +493,10 @@ function Test-AvCSPBel {
     return $false
 }
 
-# Проверка установки AvCSPBign
+# Проверка установки AvCSPBign (только реестр)
 function Test-AvCSPBign {
     Write-Log -Message "Проверка AvCSPBign..." -LogFile $script:LogPath
     
-    # 1. Проверка файловой системы
-    $paths = @(
-        "C:\Program Files\Avest\Avest CSP Bign\AvCSPr.dll",
-        "C:\Program Files (x86)\Avest\Avest CSP Bign\AvCSPr.dll",
-        "C:\Program Files\Avest\Avest CSP Bign\AvCSPBign.dll",
-        "C:\Program Files (x86)\Avest\Avest CSP Bign\AvCSPBign.dll"
-    )
-    foreach ($path in $paths) {
-        if (Test-Path $path) { 
-            Write-Log -Message "  AvCSPBign найден по пути: $path" -LogFile $script:LogPath
-            return $true 
-        }
-    }
-    
-    # 2. Проверка через реестр по DisplayName
     $regPaths = @(
         "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
         "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall"
@@ -558,5 +545,5 @@ function Test-AvReg {
     }
     
     Write-Log -Message "  AvReg не найден" -LogFile $script:LogPath
-    return $false 
+    return $false
 }
