@@ -14,9 +14,10 @@ license that can be found in the LICENSE file.
         3. Создание целевой папки C:\CertificateManager V2.0 (или указанной)
         4. Создание структуры подпапок (logs, downloads, config, avest\archives, avest\unpacked)
         5. Копирование всех скриптов и конфигурационных файлов
-        6. Создание ярлыка на рабочем столе
-        7. Настройка автозапуска (запуск Create-ScheduledTaskV2.ps1)
-        8. Автоматический запуск Менеджера сертификатов через 5 секунд
+        6. Разблокировка скриптов (удаление метки из интернета)
+        7. Создание ярлыка на рабочем столе
+        8. Настройка автозапуска (запуск Create-ScheduledTaskV2.ps1)
+        9. Автоматический запуск Менеджера сертификатов через 5 секунд
     
     Структура целевой папки:
         C:\CertificateManager V2.0\
@@ -38,14 +39,15 @@ license that can be found in the LICENSE file.
         └── Common-Functions.ps1          # Общий модуль функций
     
     Параметры (встроенные):
-        $source = "\\x\x\x"   # Источник (сетевая папка)
-        $target = "C:\CertificateManager V2.0"               # Целевая папка
+        $source = "\\ASUP-7\BackBox\DEV\DEV-CM-"   # Источник (сетевая папка)
+        $target = "C:\CertificateManager V2.0"     # Целевая папка
     
     Особенности:
         - Архивы компонентов Авест НЕ входят в развертывание
         - Архивы скачиваются при первом запуске установки компонентов
         - Ярлык создаётся на рабочем столе текущего пользователя
         - Автозапуск настраивается автоматически
+        - Скрипты автоматически разблокируются после копирования
     
     Коды возврата:
         0 - успешное развертывание
@@ -77,10 +79,35 @@ if (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
 }
 
 # ======================================================
+# 1.1. УСТАНОВКА ПОЛИТИКИ ВЫПОЛНЕНИЯ СЦЕНАРИЕВ
+# ======================================================
+Write-Host "[0/7] Проверка политики выполнения сценариев..." -ForegroundColor Yellow
+
+$currentPolicy = Get-ExecutionPolicy
+if ($currentPolicy -ne "RemoteSigned" -and $currentPolicy -ne "Unrestricted" -and $currentPolicy -ne "Bypass") {
+    Write-Host "  Текущая политика: $currentPolicy (скрипты не выполняются)" -ForegroundColor Red
+    Write-Host "  Установка политики RemoteSigned..." -ForegroundColor Gray
+    try {
+        Set-ExecutionPolicy RemoteSigned -Scope LocalMachine -Force -ErrorAction Stop
+        Write-Host "  [+] Политика успешно установлена: RemoteSigned" -ForegroundColor Green
+    } catch {
+        Write-Host "  [!] Не удалось изменить политику автоматически." -ForegroundColor Yellow
+        Write-Host "  Запустите PowerShell от имени администратора и выполните:" -ForegroundColor Cyan
+        Write-Host "     Set-ExecutionPolicy RemoteSigned -Force" -ForegroundColor White
+        Write-Host ""
+        Write-Host "  Нажмите любую клавишу для продолжения или Ctrl+C для отмены..." -ForegroundColor Gray
+        pause
+    }
+} else {
+    Write-Host "  [+] Политика уже разрешает выполнение скриптов: $currentPolicy" -ForegroundColor Green
+}
+Write-Host ""
+
+# ======================================================
 # 2. НАСТРОЙКА ПАРАМЕТРОВ
 # ======================================================
 # Источник (сетевая папка)
-$source = "\\x\x"
+$source = "C:\Users\User\Desktop\CM_V2.0"
 
 # Целевая папка
 $target = "C:\CertificateManager V2.0"
@@ -97,8 +124,8 @@ if (-not (Test-Path $source)) {
     Write-Host "Путь: $source" -ForegroundColor Yellow
     Write-Host ""
     Write-Host "Проверьте:" -ForegroundColor Cyan
-    Write-Host "  1. Доступность компьютера ASUP-7 в сети" -ForegroundColor Gray
-    Write-Host "  2. Наличие общего доступа к папке BackBox" -ForegroundColor Gray
+    Write-Host "  1. Доступность компьютера в сети" -ForegroundColor Gray
+    Write-Host "  2. Наличие общего доступа к папке" -ForegroundColor Gray
     Write-Host "  3. Правильность пути (возможно, опечатка)" -ForegroundColor Gray
     Write-Host ""
     Write-Host "Нажмите Enter для выхода..." -ForegroundColor Gray
@@ -107,6 +134,7 @@ if (-not (Test-Path $source)) {
 }
 
 Write-Host "  [+] Сетевая папка доступна: $source" -ForegroundColor Green
+Write-Host ""
 
 # Список папок для создания
 $foldersToCreate = @(
@@ -147,7 +175,7 @@ Write-Host "Цель: $target" -ForegroundColor White
 Write-Host ""
 
 # 3.1. Проверка доступности сетевой папки
-Write-Host "[1/5] Проверка доступности сетевой папки..." -ForegroundColor Yellow
+Write-Host "[1/6] Проверка доступности сетевой папки..." -ForegroundColor Yellow
 if (!(Test-Path $source)) {
     Write-Host "  [X] ОШИБКА: Сетевая папка недоступна: $source" -ForegroundColor Red
     Write-Host "  Проверьте сетевое подключение и права доступа." -ForegroundColor Red
@@ -160,7 +188,7 @@ Write-Host "  [+] Сетевая папка доступна" -ForegroundColor G
 
 # 3.2. Создание целевой папки
 Write-Host ""
-Write-Host "[2/5] Создание целевой папки..." -ForegroundColor Yellow
+Write-Host "[2/6] Создание целевой папки..." -ForegroundColor Yellow
 if (!(Test-Path $target)) {
     New-Item -ItemType Directory -Path $target -Force | Out-Null
     Write-Host "  [+] Папка создана: $target" -ForegroundColor Green
@@ -170,7 +198,7 @@ if (!(Test-Path $target)) {
 
 # 3.3. Создание структуры папок
 Write-Host ""
-Write-Host "[3/5] Создание структуры папок..." -ForegroundColor Yellow
+Write-Host "[3/6] Создание структуры папок..." -ForegroundColor Yellow
 
 foreach ($folder in $foldersToCreate) {
     $fullPath = Join-Path $target $folder
@@ -184,7 +212,7 @@ foreach ($folder in $foldersToCreate) {
 
 # 3.4. Копирование файлов скриптов
 Write-Host ""
-Write-Host "[4/5] Копирование файлов..." -ForegroundColor Yellow
+Write-Host "[4/6] Копирование файлов..." -ForegroundColor Yellow
 
 $copied = 0
 $skipped = 0
@@ -205,7 +233,7 @@ foreach ($fileName in $filesToCopy) {
 
 # 3.5. Копирование конфигурационных файлов
 Write-Host ""
-Write-Host "[5/5] Копирование конфигурационных файлов..." -ForegroundColor Yellow
+Write-Host "[5/6] Копирование конфигурационных файлов..." -ForegroundColor Yellow
 
 foreach ($fileName in $configFiles) {
     $sourceFile = Join-Path $source "config" | Join-Path -ChildPath $fileName
@@ -223,6 +251,30 @@ foreach ($fileName in $configFiles) {
 
 Write-Host ""
 Write-Host "  Результат: $copied скопировано, $skipped пропущено" -ForegroundColor Gray
+
+# ======================================================
+# 3.6. РАЗБЛОКИРОВКА СКРИПТОВ (удаление метки из интернета)
+# ======================================================
+Write-Host ""
+Write-Host "[6/6] Разблокировка скриптов..." -ForegroundColor Yellow
+
+$psFiles = Get-ChildItem -Path $target -Filter "*.ps1" -Recurse -ErrorAction SilentlyContinue
+$unblocked = 0
+
+if ($psFiles.Count -gt 0) {
+    foreach ($file in $psFiles) {
+        try {
+            Unblock-File -Path $file.FullName -ErrorAction Stop
+            Write-Host "  [+] Разблокирован: $($file.Name)" -ForegroundColor Green
+            $unblocked++
+        } catch {
+            Write-Host "  [!] Не удалось разблокировать: $($file.Name)" -ForegroundColor Gray
+        }
+    }
+    Write-Host "  Разблокировано файлов: $unblocked из $($psFiles.Count)" -ForegroundColor Green
+} else {
+    Write-Host "  [!] Файлы .ps1 не найдены" -ForegroundColor Yellow
+}
 
 # ======================================================
 # 4. СОЗДАНИЕ ЯРЛЫКА НА РАБОЧЕМ СТОЛЕ
