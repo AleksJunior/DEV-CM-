@@ -54,9 +54,7 @@ license that can be found in the LICENSE file.
         - AvReg добавляет ключи в реестр для загрузки SAI DLL
 #>
 
-param(
-    [string]$ScriptPath
-)
+param([string]$ScriptPath)
 
 # ======================================================
 # ПРОВЕРКА ПРАВ АДМИНИСТРАТОРА
@@ -86,10 +84,10 @@ $unpackedFolder = Join-Path $avestFolder "unpacked"
 $logsFolder = Join-Path $ScriptPath "logs"
 $configFile = Join-Path $configFolder "avest_urls.ini"
 
+# Создаём папки
 foreach ($folder in @($configFolder, $avestFolder, $archivesFolder, $unpackedFolder, $logsFolder)) {
     if (!(Test-Path $folder)) { 
         New-Item -ItemType Directory -Path $folder -Force | Out-Null
-        Write-Host "  Создана папка: $folder" -ForegroundColor Gray
     }
 }
 
@@ -107,10 +105,8 @@ if (Test-Path $commonScript) {
 }
 
 Write-Log -Message "========================================" -LogFile $logFile
-Write-Log -Message "Установка компонентов Авест" -LogFile $logFile
+Write-Log -Message "Установка компонентов Авест V2.1" -LogFile $logFile
 Write-Log -Message "========================================" -LogFile $logFile
-Write-Log -Message "Путь скрипта: $ScriptPath" -LogFile $logFile
-Write-Log -Message "Файл лога: $logFile" -LogFile $logFile
 
 # ======================================================
 # 3. ЗАГРУЗКА КОНФИГУРАЦИИ
@@ -125,6 +121,89 @@ if ($config.Count -eq 0) {
 # ======================================================
 # 4. ПРОВЕРКА СТАТУСА КОМПОНЕНТОВ
 # ======================================================
+function Test-AvPass {
+    $paths = @(
+        "C:\Program Files\Avest\AvPCM_nces\AvPCM.exe",
+        "C:\Program Files (x86)\Avest\AvPCM_nces\AvPCM.exe",
+        "C:\Program Files\Avest\AvPCM_ncesBign\AvPCM.exe",
+        "C:\Program Files (x86)\Avest\AvPCM_ncesBign\AvPCM.exe"
+    )
+    foreach ($path in $paths) { if (Test-Path $path) { return $true } }
+    
+    $regPaths = @("HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*", "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*")
+    foreach ($regPath in $regPaths) {
+        $items = Get-ChildItem -Path $regPath -ErrorAction SilentlyContinue
+        foreach ($item in $items) {
+            try {
+                $displayName = Get-ItemProperty -Path $item.PSPath -Name "DisplayName" -ErrorAction SilentlyContinue
+                if ($displayName.DisplayName -like "*AvPCM*" -or $displayName.DisplayName -like "*Комплект Абонента*") { return $true }
+            } catch { }
+        }
+    }
+    return $false
+}
+
+function Test-AvBign {
+    $paths = @(
+        "C:\Program Files\Avest\AvPCM_ncesBign\AvBign.exe",
+        "C:\Program Files (x86)\Avest\AvPCM_ncesBign\AvBign.exe"
+    )
+    foreach ($path in $paths) { if (Test-Path $path) { return $true } }
+    
+    $regPaths = @("HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*", "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*")
+    foreach ($regPath in $regPaths) {
+        $items = Get-ChildItem -Path $regPath -ErrorAction SilentlyContinue
+        foreach ($item in $items) {
+            try {
+                $displayName = Get-ItemProperty -Path $item.PSPath -Name "DisplayName" -ErrorAction SilentlyContinue
+                if ($displayName.DisplayName -like "*AvBign*") { return $true }
+            } catch { }
+        }
+    }
+    return $false
+}
+
+function Test-AvCSPBel {
+    $regPaths = @("HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*", "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*")
+    foreach ($regPath in $regPaths) {
+        $items = Get-ChildItem -Path $regPath -ErrorAction SilentlyContinue
+        foreach ($item in $items) {
+            try {
+                $displayName = Get-ItemProperty -Path $item.PSPath -Name "DisplayName" -ErrorAction SilentlyContinue
+                if ($displayName.DisplayName -like "*AvCSPBel*" -or $displayName.DisplayName -like "*Avest CSP Bel*") { return $true }
+            } catch { }
+        }
+    }
+    return $false
+}
+
+function Test-AvCSPBign {
+    $regPaths = @("HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*", "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*")
+    foreach ($regPath in $regPaths) {
+        $items = Get-ChildItem -Path $regPath -ErrorAction SilentlyContinue
+        foreach ($item in $items) {
+            try {
+                $displayName = Get-ItemProperty -Path $item.PSPath -Name "DisplayName" -ErrorAction SilentlyContinue
+                if ($displayName.DisplayName -like "*AvCSPBign*" -or $displayName.DisplayName -like "*Avest CSP Bign*") { return $true }
+            } catch { }
+        }
+    }
+    return $false
+}
+
+function Test-AvReg {
+    $path1 = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Windows"
+    $path2 = "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows NT\CurrentVersion\Windows"
+    try {
+        $val1 = (Get-ItemProperty -Path $path1 -Name "LoadAppInit_DLLs" -ErrorAction SilentlyContinue).LoadAppInit_DLLs
+        $val2 = (Get-ItemProperty -Path $path1 -Name "RequireSignedAppInit_DLLs" -ErrorAction SilentlyContinue).RequireSignedAppInit_DLLs
+        $val3 = (Get-ItemProperty -Path $path2 -Name "LoadAppInit_DLLs" -ErrorAction SilentlyContinue).LoadAppInit_DLLs
+        $val4 = (Get-ItemProperty -Path $path2 -Name "RequireSignedAppInit_DLLs" -ErrorAction SilentlyContinue).RequireSignedAppInit_DLLs
+        if ($val1 -eq 1 -and $val2 -eq 0 -and $val3 -eq 1 -and $val4 -eq 0) { return $true }
+    } catch { }
+    return $false
+}
+
 $componentStatus = @{
     "AvPass" = Test-AvPass
     "AvBign" = Test-AvBign
@@ -149,167 +228,147 @@ foreach ($component in $components) {
 Write-Host ""
 
 # ======================================================
-# 5. ПРЕДУПРЕЖДЕНИЕ ОБ АНТИВИРУСЕ
+# 5. ФУНКЦИИ СКАЧИВАНИЯ И УСТАНОВКИ
 # ======================================================
-Write-Host ("="*70) -ForegroundColor Cyan
-Write-Host "  ВНИМАНИЕ!" -ForegroundColor Red
-Write-Host "  Если антивирус блокирует установку," -ForegroundColor Yellow
-Write-Host "  добавьте папку в исключения:" -ForegroundColor Yellow
-Write-Host "  $ScriptPath" -ForegroundColor White
-Write-Host ("="*70) -ForegroundColor Cyan
-Write-Host ""
-Start-Sleep -Seconds 3
 
-# ======================================================
-# 6. ФУНКЦИИ УСТАНОВКИ
-# ======================================================
-function Install-Component {
+function Clear-UnpackedFolder {
+    Write-Host "  Очистка папки unpacked..." -ForegroundColor Gray
+    if (Test-Path $unpackedFolder) {
+        Remove-Item -Path $unpackedFolder -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    New-Item -ItemType Directory -Path $unpackedFolder -Force | Out-Null
+    Write-Log -Message "Папка unpacked очищена" -LogFile $logFile
+}
+
+function Download-And-Restart {
     param(
-        [string]$Component,
         [hashtable]$Config,
-        [bool]$ForceReinstall = $false
+        [string]$Component
     )
     
     $archivePath = Join-Path $archivesFolder $Config.FileName
-    $archiveExists = Test-Path $archivePath
-    $targetFile = Join-Path $unpackedFolder $Config.InstallerName
-    $fileExists = Test-Path $targetFile
     
-    # Для AvPass/AvBign — если не найден, ищем рекурсивно
-    if (-not $fileExists -and ($Component -eq "AvPass" -or $Component -eq "AvBign")) {
-        $found = Get-ChildItem -Path $unpackedFolder -Recurse -Filter "AvPKISetup2.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($found) {
-            $targetFile = $found.FullName
-            $fileExists = $true
-            Write-Host "  Найден установщик (рекурсивно): $targetFile" -ForegroundColor Green
-        }
+    Write-Host "  Скачивание архива: $($Config.FileName)" -ForegroundColor Gray
+    
+    # Удаляем старый архив, если есть
+    if (Test-Path $archivePath) {
+        Remove-Item $archivePath -Force -ErrorAction SilentlyContinue
     }
     
-    # Проверка: архив есть, но нет распакованных файлов
-    if ($archiveExists -and -not $fileExists) {
-        Write-Host "`n[$Component] Архив найден, выполняю распаковку..." -ForegroundColor Yellow
-        $extracted = Expand-Archive -ArchivePath $archivePath -DestinationPath $unpackedFolder
-        if (-not $extracted) {
-            Write-Host "  Не удалось распаковать архив" -ForegroundColor Red
-            return $false
-        }
-        Write-Host "  Распаковка завершена!" -ForegroundColor Green
-        $fileExists = Test-Path $targetFile
-        
-        # Повторный поиск для AvPass/AvBign
-        if (-not $fileExists -and ($Component -eq "AvPass" -or $Component -eq "AvBign")) {
-            $found = Get-ChildItem -Path $unpackedFolder -Recurse -Filter "AvPKISetup2.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-            if ($found) {
-                $targetFile = $found.FullName
-                $fileExists = $true
-            }
-        }
+    $downloaded = Save-FileWithFallback -Config $Config -DestinationFolder $archivesFolder
+    
+    if (-not $downloaded) {
+        Write-Host "  ОШИБКА: Не удалось скачать архив" -ForegroundColor Red
+        Write-Log -Message "Не удалось скачать архив для $Component" -LogFile $logFile
+        return $false
     }
     
-    # Проверка: нет архива и нет распакованных файлов
-    if (-not $archiveExists -and -not $fileExists) {
-        Write-Host "`n[$Component] Локальные файлы не найдены." -ForegroundColor Yellow
-        
-        if (Test-InternetConnection) {
-            Write-Host "  Скачивание архива..." -ForegroundColor Gray
-            $downloaded = Save-FileWithFallback -Config $Config -DestinationFolder $archivesFolder
-            if (-not $downloaded) {
-                Write-Host "  Не удалось скачать архив" -ForegroundColor Red
-                Write-Host "  Пожалуйста, скачайте архив вручную и поместите в:" -ForegroundColor Yellow
-                Write-Host "    $archivesFolder\$($Config.FileName)" -ForegroundColor Gray
-                return $false
-            }
-            
-            Write-Host "  Распаковка архива..." -ForegroundColor Gray
-            $extracted = Expand-Archive -ArchivePath $archivePath -DestinationPath $unpackedFolder
-            if (-not $extracted) {
-                Write-Host "  Не удалось распаковать архив" -ForegroundColor Red
-                return $false
-            }
-            Write-Host "  Распаковка завершена!" -ForegroundColor Green
-            $fileExists = Test-Path $targetFile
-            
-            # Повторный поиск для AvPass/AvBign
-            if (-not $fileExists -and ($Component -eq "AvPass" -or $Component -eq "AvBign")) {
-                $found = Get-ChildItem -Path $unpackedFolder -Recurse -Filter "AvPKISetup2.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-                if ($found) {
-                    $targetFile = $found.FullName
-                    $fileExists = $true
-                }
-            }
-        } else {
-            Write-Host "  ОШИБКА: Нет доступа к интернету и архив отсутствует!" -ForegroundColor Red
-            Write-Host "  Пожалуйста, скачайте архив вручную и поместите в:" -ForegroundColor Yellow
-            Write-Host "    $archivesFolder\$($Config.FileName)" -ForegroundColor Gray
-            return $false
-        }
-    }
+    Write-Host "  Распаковка архива..." -ForegroundColor Gray
     
-    # Проверка повреждённых файлов
-    if ((Test-Path $unpackedFolder) -and (-not $fileExists)) {
-        Write-Host "`n[$Component] Обнаружены повреждённые файлы! Выполняю повторную распаковку..." -ForegroundColor Yellow
-        if ($archiveExists) {
-            Remove-Item -Path $unpackedFolder -Recurse -Force -ErrorAction SilentlyContinue
-            New-Item -ItemType Directory -Path $unpackedFolder -Force | Out-Null
-            $extracted = Expand-Archive -ArchivePath $archivePath -DestinationPath $unpackedFolder
-            if (-not $extracted) {
-                Write-Host "  Не удалось распаковать архив" -ForegroundColor Red
-                return $false
-            }
-            Write-Host "  Повторная распаковка завершена!" -ForegroundColor Green
-            $fileExists = Test-Path $targetFile
-            
-            if (-not $fileExists -and ($Component -eq "AvPass" -or $Component -eq "AvBign")) {
-                $found = Get-ChildItem -Path $unpackedFolder -Recurse -Filter "AvPKISetup2.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-                if ($found) {
-                    $targetFile = $found.FullName
-                    $fileExists = $true
-                }
-            }
-        }
-    }
-    
-    # Переустановка
-    if ($componentStatus[$Component] -and -not $ForceReinstall) {
-        Write-Host "`n[$Component] УЖЕ УСТАНОВЛЕН" -ForegroundColor Yellow
-        $reinstall = Confirm-Action -Message "Переустановить $Component?"
-        if (-not $reinstall) {
-            Write-Host "  Установка пропущена." -ForegroundColor Gray
-            return $false
-        }
-    }
-    
-    # Финальная проверка
-    if (-not $fileExists) {
-        Write-Host "`n[$Component] ОШИБКА: Установщик не найден!" -ForegroundColor Red
-        Write-Host "  Искали: $($Config.InstallerName)" -ForegroundColor Yellow
-        Write-Host "  Содержимое папки распаковки:" -ForegroundColor Gray
-        Get-ChildItem -Path $unpackedFolder -Recurse | ForEach-Object {
-            Write-Host "    $($_.FullName)" -ForegroundColor Gray
-        }
-        Write-Host ""
-        Write-Host "  Запустите установщик вручную из папки выше." -ForegroundColor Yellow
-        Write-Host "  Нажмите Enter после завершения установки..." -ForegroundColor Gray
-        Read-Host
-        $componentStatus[$Component] = $true
+    try {
+        Microsoft.PowerShell.Archive\Expand-Archive -Path $archivePath -DestinationPath $unpackedFolder -Force -ErrorAction Stop
+        Write-Host "  Распаковка завершена" -ForegroundColor Green
+        Write-Log -Message "Архив распакован для $Component" -LogFile $logFile
         return $true
+    } catch {
+        Write-Host "  ОШИБКА распаковки: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Log -Message "Ошибка распаковки для $Component : $($_.Exception.Message)" -LogFile $logFile
+        return $false
+    }
+}
+
+function Find-Installer {
+    param(
+        [string]$Component,
+        [hashtable]$Config
+    )
+    
+    $installerName = $Config.InstallerName
+    
+    switch ($Component) {
+        "AvPass" {
+            $path = Join-Path $unpackedFolder "AvPKISetup(bel)\AvPKISetup2.exe"
+            if (Test-Path $path) { return $path }
+        }
+        "AvBign" {
+            $path = Join-Path $unpackedFolder "AvPKISetup(bign)\AvPKISetup2.exe"
+            if (Test-Path $path) { return $path }
+        }
+        "AvCSPBel" {
+        # Ищем в data папке bel
+        $belDataPath = Join-Path $unpackedFolder "AvPKISetup(bel)\data"
+        if (Test-Path $belDataPath) {
+            $found = Get-ChildItem -Path $belDataPath -Filter "setupAvCSPBel*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) { return $found.FullName }
+        }
+    
+        # Ищем в корне unpacked (отдельный архив)
+        $found = Get-ChildItem -Path $unpackedFolder -Filter "setupAvCSPBel*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($found) { return $found.FullName }
+        }
+        "AvCSPBign" {
+        # Ищем в data папке bign
+        $bignDataPath = Join-Path $unpackedFolder "AvPKISetup(bign)\data"
+        if (Test-Path $bignDataPath) {
+            $found = Get-ChildItem -Path $bignDataPath -Filter "setupAvCSPBign*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) { return $found.FullName }
+        }
+    
+        # Ищем в корне unpacked (отдельный архив)
+        $found = Get-ChildItem -Path $unpackedFolder -Filter "setupAvCSPBign*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($found) { return $found.FullName }
+        }
+      }
+    return $null
+}
+
+function Install-Component {
+    param(
+        [string]$Component,
+        [hashtable]$Config
+    )
+    
+    Write-Host "`n" + ("="*70) -ForegroundColor Cyan
+    Write-Host "  УСТАНОВКА: $Component" -ForegroundColor Yellow
+    Write-Host ("="*70) -ForegroundColor Cyan
+    
+    # 1. Очищаем unpacked
+    Clear-UnpackedFolder
+    
+    # 2. Скачиваем и распаковываем
+    $success = Download-And-Restart -Config $Config -Component $Component
+    if (-not $success) { return $false }
+    
+    # 3. Ищем установщик
+    Write-Host "  Поиск установщика..." -ForegroundColor Gray
+    $installerPath = Find-Installer -Component $Component -Config $Config
+    
+    if (-not $installerPath) {
+        Write-Host "  ОШИБКА: Установщик не найден!" -ForegroundColor Red
+        Write-Log -Message "Установщик для $Component не найден" -LogFile $logFile
+        return $false
     }
     
-    # Запуск установщика
-    Write-Host "`n[$Component] Запуск установщика..." -ForegroundColor Yellow
-    Write-Host "  Файл: $targetFile" -ForegroundColor Gray
-    Write-Host "  Следуйте инструкциям мастера." -ForegroundColor Cyan
-    Write-Host "  После завершения установки закройте окно установщика." -ForegroundColor Gray
+    Write-Host "  Найден: $(Split-Path $installerPath -Leaf)" -ForegroundColor Green
     
-    Start-Process -FilePath $targetFile -Wait
+    # 4. Запускаем установку
+    Write-Host "  Запуск установки..." -ForegroundColor Gray
     
-    Write-Host "  $Component установлен успешно!" -ForegroundColor Green
-    $componentStatus[$Component] = $true
+    if ($Component -eq "AvReg") {
+        regedit /s $installerPath
+        Write-Host "  Реестровые настройки импортированы" -ForegroundColor Green
+    } else {
+        Write-Host "  Следуйте инструкциям мастера установки." -ForegroundColor Yellow
+        Start-Process -FilePath $installerPath -Wait
+        Write-Host "  Установка завершена" -ForegroundColor Green
+    }
+    
+    Write-Log -Message "$Component установлен успешно" -LogFile $logFile
     return $true
 }
 
 # ======================================================
-# 7. ОСНОВНОЙ ЦИКЛ
+# 6. ОСНОВНОЙ ЦИКЛ
 # ======================================================
 $continue = $true
 
@@ -336,7 +395,7 @@ while ($continue) {
     Write-Host "  0. Завершить работу" -ForegroundColor Red
     Write-Host ""
     
-    $choice = Read-Host "Введите номер компонента для установки (0-$($components.Count))"
+    $choice = Read-Host "Введите номер компонента (0-$($components.Count))"
     
     if (-not ($choice -match '^\d+$')) {
         Write-Host "Неверный ввод. Введите число." -ForegroundColor Red
@@ -351,41 +410,34 @@ while ($continue) {
         $selected = $numbers[$choice]
         
         if (-not $selected -or -not $config.ContainsKey($selected)) {
-            Write-Host "  [!] Компонент $selected не найден в конфигурации" -ForegroundColor Yellow
+            Write-Host "  Компонент $selected не найден в конфигурации" -ForegroundColor Yellow
             continue
         }
         
         $componentConfig = $config[$selected]
         
         $action = if ($componentStatus[$selected]) { "переустановить" } else { "установить" }
-        $confirmed = Confirm-Action -Message "$action $selected?"
+        Write-Host ""
+        $confirm = Read-Host "$action $selected? (д/н)"
         
-        if (-not $confirmed) {
+        if ($confirm -ne "д" -and $confirm -ne "Д" -and $confirm -ne "y" -and $confirm -ne "Y") {
             Write-Host "  Операция отменена." -ForegroundColor Gray
             continue
         }
         
-        $installed = Install-Component -Component $selected -Config $componentConfig -ForceReinstall $true
+        $installed = Install-Component -Component $selected -Config $componentConfig
         
         if ($installed) {
             $componentStatus[$selected] = $true
         }
         
-        try {
-            Write-Host ""
-            Write-Host "Нажмите Enter для продолжения..." -ForegroundColor Gray
-            Read-Host -ErrorAction Stop
-        } catch {
-            Write-Host "`nЗавершение работы..." -ForegroundColor Gray
-            $script:NormalExit = $true
-            break
-        }
-        
+        Write-Host ""
+        Write-Host "Нажмите Enter для продолжения..." -ForegroundColor Gray
+        Read-Host
     } else {
         Write-Host "Неверный выбор. Попробуйте снова." -ForegroundColor Red
     }
 }
 
-$script:NormalExit = $true
 Write-Host "`nУстановка компонентов завершена." -ForegroundColor Green
 exit 0
