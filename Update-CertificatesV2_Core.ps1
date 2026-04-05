@@ -363,7 +363,7 @@ foreach ($url in $urls) {
     $downloadedCount++
     Write-Host "`n[$downloadedCount/$totalUrls] $fileName"
     
-    if (Download-File -url $url -savePath $tempFile) {
+    if (Save-File -url $url -savePath $tempFile) {
         $size = (Get-Item $tempFile).Length
         Write-Host "  Скачано, размер: $size байт"
         Write-LogEntry "ОК (скачивание): $fileName ($size байт)"
