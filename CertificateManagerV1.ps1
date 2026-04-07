@@ -48,11 +48,11 @@ if ($MyInvocation.MyCommand.CommandType -eq "ExternalScript") {
 # ======================================================
 # ЗАГРУЗКА ОБЩИХ ФУНКЦИЙ
 # ======================================================
-$commonScript = Join-Path $scriptPath "Common-Functions.ps1"
+$commonScript = Join-Path $scriptPath "Common-FunctionsV1.ps1"
 if (Test-Path $commonScript) {
     . $commonScript
 } else {
-    [System.Windows.Forms.MessageBox]::Show("Common-Functions.ps1 не найден!`nПуть: $commonScript", "Ошибка", "OK", "Error")
+    [System.Windows.Forms.MessageBox]::Show("Common-FunctionsV1.ps1 не найден!`nПуть: $commonScript", "Ошибка", "OK", "Error")
     exit 1
 }
 
@@ -66,7 +66,7 @@ $avestInstallRunning = $false
 
 # Создаем форму
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "Менеджер сертификатов V2.1"
+$form.Text = "Менеджер сертификатов V1"
 $form.Size = New-Object System.Drawing.Size(515, 440)
 $form.StartPosition = "CenterScreen"
 $form.FormBorderStyle = "FixedSingle"
@@ -76,7 +76,7 @@ $form.BackColor = [System.Drawing.Color]::FromArgb(240, 240, 240)
 
 # Заголовок
 $label = New-Object System.Windows.Forms.Label
-$label.Text = "Менеджер сертификатов V2.1"
+$label.Text = "Менеджер сертификатов V1"
 $label.Font = New-Object System.Drawing.Font("Segoe UI", 16, [System.Drawing.FontStyle]::Bold)
 $label.ForeColor = [System.Drawing.Color]::FromArgb(0, 102, 204)
 $label.AutoSize = $true
