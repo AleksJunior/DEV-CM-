@@ -1,5 +1,5 @@
 # DEV-CM-
-# "Менеджер сертификатов" V2.0 
+# "Менеджер сертификатов" V1.0 
 
 Это комплекс PowerShell-скриптов для автоматизации управления сертификатами и 
 криптографическими компонентами в инфраструктуре Республики Беларусь.
@@ -14,7 +14,7 @@
 | Мониторинг                  | Проверка статуса установленных компонентов и логирование всех операций                     |
 
 
-# Certificate Manager V2.0
+# Certificate Manager V1.0
 
 Is a suite of PowerShell scripts designed to automate certificate and cryptographic component management within the infrastructure of the Republic of Belarus.
 
