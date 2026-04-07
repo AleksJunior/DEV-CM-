@@ -258,10 +258,10 @@ $avcmxBtn.Add_Click({
     $avestBtn.Enabled = $false
     
     try {
-        $installScript = Join-Path $scriptPath "Install-AvCMXWebP.ps1"
+        $installScript = Join-Path $scriptPath "Install-AvCMXWebPV1.ps1"
         
         if (!(Test-Path $installScript)) {
-            throw "Install-AvCMXWebP.ps1 не найден"
+            throw "Install-AvCMXWebPV1.ps1 не найден"
         }
         
         $process = Start-Process -FilePath "powershell.exe" `
@@ -321,7 +321,7 @@ $schedulerBtn.Add_Click({
     
     try {
         $process = Start-Process -FilePath "powershell.exe" `
-            -ArgumentList "-NoProfile -File `"$scriptPath\Create-ScheduledTaskV2.ps1`"" `
+            -ArgumentList "-NoProfile -File `"$scriptPath\Create-ScheduledTaskV1.ps1`"" `
             -Verb RunAs -WindowStyle Normal -Wait -PassThru
         
         if ($process.ExitCode -eq 0) {

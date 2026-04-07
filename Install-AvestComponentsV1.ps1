@@ -55,7 +55,7 @@ $logFile = Join-Path $logsFolder "avest_install_$(Get-Date -Format 'yyyy-MM-dd_H
 # ======================================================
 # 2. ЗАГРУЗКА ОБЩИХ ФУНКЦИЙ
 # ======================================================
-$commonScript = Join-Path $ScriptPath "Common-Functions.ps1"
+$commonScript = Join-Path $ScriptPath "Common-FunctionsV1.ps1"
 if (Test-Path $commonScript) {
     . $commonScript
 } else {
