@@ -17,17 +17,12 @@ MIT License
     Ищет AvCmUt4.exe и MngCert.exe в C:\Program Files\Avest\AvPCM*\.
     При импорте проверяет "already exists", NTE_BAD_KEYSET (fallback через .NET).
     Перед импортом закрывает блокирующие процессы (AvPCM, MngCert, mmc, certmgr).
-    Результат в JSON (если передан -ResultFile).
 .NOTES
     Версия: 1.0
     Папка деплоя: C:\CM
     Логи: C:\CM\logs\import_*.log
     Временная папка: $env:TEMP\cert_import_*
 #>
-
-param(
-    [string]$ResultFile
-)
 
 # ======================================================
 # 1. НАСТРОЙКА ПУТЕЙ
@@ -264,15 +259,6 @@ if (-not $mngCert) {
 }
 
 # ======================================================
-# 5.1. ПРОВЕРКА ЦЕЛОСТНОСТИ
-# ======================================================
-if ($avCmUt4 -and $mngCert) {
-    $integrityOK = $true
-} else {
-    $integrityOK = $false
-}
-
-# ======================================================
 # 6. ПРОВЕРКИ
 # ======================================================
 Write-Host ("="*70)
@@ -482,24 +468,7 @@ Write-Host ("="*70)
 "@ | Out-File $logFile -Append
 
 # ======================================================
-# 11. СОХРАНЕНИЕ РЕЗУЛЬТАТА
-# ======================================================
-if ($ResultFile) {
-    $result = @{
-        Success = $totalImported
-        Errors = $totalErrors
-        Total = $downloadedCount
-        LogFile = $logFile
-        Timestamp = (Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-        AvCmUt4 = if ($avCmUt4) { "Найден" } else { "Не найден" }
-        MngCert = if ($mngCert) { "Найден" } else { "Не найден" }
-        IntegrityCheck = if ($integrityOK) { "Пройдена" } else { "Нарушена" }
-    } | ConvertTo-Json
-    $result | Out-File $ResultFile -Encoding utf8
-}
-
-# ======================================================
-# 12. ОЧИСТКА
+# 11. ОЧИСТКА
 # ======================================================
 Remove-Item $tempFolder -Recurse -Force -ErrorAction SilentlyContinue
 

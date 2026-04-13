@@ -21,10 +21,6 @@ license that can be found in the LICENSE file.
         - Шаг 2 (установка компонентов) можно пропустить, если компоненты уже установлены
         - Если скрипт установки не найден, выполняется только обновление сертификатов
     
-    Параметры:
-        -ResultFile : путь к файлу для сохранения результата в формате JSON
-                          (передаётся в Update-CertificatesV1_Core.ps1)
-    
     Коды возврата:
         0 - успешное завершение
         1 - ошибка (проблемы с установкой компонентов или обновлением сертификатов)
@@ -54,10 +50,6 @@ license that can be found in the LICENSE file.
         - При обновлении существующих компонентов будет предложена переустановка
         - Все операции логируются в папку .\logs\
 #>
-
-param(
-    [string]$ResultFile
-)
 
 # ======================================================
 # 1. НАСТРОЙКА ПУТЕЙ
@@ -100,7 +92,7 @@ Write-Host ""
 Write-Host "[2/2] Обновление сертификатов..." -ForegroundColor Yellow
 
 if (Test-Path $certScript) {
-    & $certScript -ResultFile $ResultFile
+    & $certScript
     exit $LASTEXITCODE
 } else {
     Write-Host "  ОШИБКА: Скрипт обновления сертификатов не найден: $certScript" -ForegroundColor Red
