@@ -153,7 +153,7 @@ Certif.  Compon.             TaskV1
 Создание задачи в планировщике Windows.
 
 **Параметры задачи:**
-- Имя: `Update-OnlyCertificates`
+- Имя: `Update-OnlyCertificatesV1`
 - Триггер: при старте системы
 - Задержка: 2 минуты
 - Пользователь: SYSTEM
@@ -377,13 +377,13 @@ Get-Content "C:\CM\logs\import_*.log" -Tail 50
 Get-ExecutionPolicy
 
 # Проверка задачи в планировщике
-schtasks /query /tn Update-OnlyCertificates
+schtasks /query /tn Update-OnlyCertificatesV1
 
 # Запуск задачи вручную
-schtasks /run /tn Update-OnlyCertificates
+schtasks /run /tn Update-OnlyCertificatesV1
 
 # Удаление задачи
-schtasks /delete /tn Update-OnlyCertificates /f
+schtasks /delete /tn Update-OnlyCertificatesV1 /f
 
 ---
 
